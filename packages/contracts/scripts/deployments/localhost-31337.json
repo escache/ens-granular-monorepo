@@ -1,0 +1,10 @@
+{
+  "network": "localhost",
+  "chainId": "31337",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "ensRegistry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+  "nameWrapper": "0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401",
+  "granularController": "0xe1fC830Bf20308cBBa2B248C543E305b979A64Ec",
+  "granularResolver": "0x866bF431d7043c9A0AD8E9259ca291EeB2305a8a",
+  "timestamp": "2025-11-27T01:24:07.043Z"
+}

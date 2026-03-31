@@ -1,0 +1,13 @@
+{
+  "network": "localhost",
+  "chainId": "31337",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "factory": "0xe2A04F5d91D1AD137f854C5820C76e5b711158c5",
+  "testProject": {
+    "name": "test-project",
+    "basicDelegate": "0xd761e66069F7BB606729EDdcc1F7f5684EECffB7",
+    "granularDelegate": "0x774490a1383498662b5949f30aBF4c8731a22c73",
+    "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  },
+  "timestamp": "2025-11-27T01:25:23.333Z"
+}

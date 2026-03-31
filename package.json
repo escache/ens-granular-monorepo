@@ -1,0 +1,59 @@
+{
+  "name": "ens-granular-monorepo",
+  "version": "1.0.0",
+  "description": "A comprehensive toolkit for ENS domain management with granular delegation capabilities",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "docs"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspace=docs",
+    "docs:build": "npm run build --workspace=docs",
+    "docs:serve": "npm run serve --workspace=docs",
+    "docs:start": "npm run start --workspace=docs",
+    "docs:clear": "npm run clear --workspace=docs",
+    "docs:write-translations": "npm run write-translations --workspace=docs",
+    "docs:write-heading-ids": "npm run write-heading-ids --workspace=docs",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "test:contracts": "npm run test --workspace=@ens-granular/contracts",
+    "test:contracts:fork": "npm run test:fork --workspace=@ens-granular/contracts",
+    "test:contracts:coverage": "npm run coverage --workspace=@ens-granular/contracts",
+    "test:contracts:gas": "npm run gas-report --workspace=@ens-granular/contracts",
+    "test:ui": "npm run test --workspace=@ens-granular/ui",
+    "test:all": "npm run test:contracts && npm run test:ui",
+    "clean": "npm run clean --workspaces"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "^3.3.2",
+    "@docusaurus/preset-classic": "^3.3.2",
+    "@docusaurus/theme-mermaid": "^3.3.2",
+    "@docusaurus/plugin-google-analytics": "^3.3.2",
+    "@docusaurus/plugin-sitemap": "^3.3.2",
+    "@docusaurus/plugin-ideal-image": "^3.3.2",
+    "@docusaurus/plugin-pwa": "^3.3.2",
+    "typescript": "^5.3.3",
+    "lerna": "^8.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ens-granular-monorepo.git"
+  },
+  "keywords": [
+    "ens",
+    "ethereum",
+    "delegation",
+    "permissions",
+    "smart-contracts",
+    "web3",
+    "dns",
+    "naming"
+  ],
+  "author": "ENS Granular Team",
+  "license": "MIT"
+}

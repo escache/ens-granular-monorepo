@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+dist/
+.next/
+out/
+cache/
+coverage/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# CI: re-add when gh token has workflow scope
+.github/workflows/

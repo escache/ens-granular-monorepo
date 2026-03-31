@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-11-27T01:31:45.260Z",
+  "duration": "22.88s",
+  "config": {
+    "forkMainnet": false,
+    "coverage": false,
+    "gasReport": false
+  },
+  "results": {
+    "success": true,
+    "testsRun": 0
+  },
+  "environment": {
+    "node": "v18.19.1",
+    "platform": "darwin",
+    "arch": "x64"
+  }
+}
