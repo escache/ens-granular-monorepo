@@ -34,7 +34,7 @@ export function EnterpriseApp() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { isConnected, address } = useAccount();
-  const { connectors, connect } = useConnect();
+  const { connectors, connect, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
   const { resolverAddress, setResolverAddress } = useAppContext();
 
@@ -82,6 +82,8 @@ export function EnterpriseApp() {
               connectors={connectors}
               connect={connect}
               disconnect={disconnect}
+              isPending={isPending}
+              error={error}
             />
           </div>
         </div>
@@ -142,6 +144,8 @@ export function EnterpriseApp() {
               connectors={connectors}
               connect={connect}
               disconnect={disconnect}
+              isPending={isPending}
+              error={error}
             />
           </div>
         </div>
