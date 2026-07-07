@@ -206,8 +206,8 @@ export function EmergencyControls({ delegateAddress }: EmergencyControlsProps) {
                   }}
                 />
               )}
-            </div>
-          )}
+            </form>
+          </div>
         </>
       )}
 
