@@ -3,7 +3,7 @@ import { Connector } from 'wagmi';
 interface ConnectButtonProps {
   isConnected: boolean;
   address?: string;
-  connectors: Connector[];
+  connectors: readonly Connector[];
   connect: (args: { connector: Connector }) => void;
   disconnect: () => void;
 }

@@ -50,7 +50,7 @@ export function Settings({ onResolverAddressChange }: SettingsProps) {
               </span>
               <select
                 onChange={(e) => {
-                  const newChainId = parseInt(e.target.value);
+                  const newChainId = Number(e.target.value) as typeof chainId;
                   if (newChainId !== chainId) {
                     switchChain({ chainId: newChainId });
                   }

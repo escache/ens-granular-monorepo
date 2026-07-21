@@ -5,18 +5,19 @@ import { Dashboard } from '../Dashboard';
 describe('Dashboard', () => {
   it('renders dashboard title', () => {
     render(<Dashboard />);
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('ENS Management Overview')).toBeInTheDocument();
   });
 
-  it('displays overview text', () => {
+  it('displays stat cards', () => {
     render(<Dashboard />);
-    expect(screen.getByText('Overview of your ENS delegation management')).toBeInTheDocument();
-  });
-
-  it('shows stats cards', () => {
-    render(<Dashboard />);
-    expect(screen.getByText('Connected Wallet')).toBeInTheDocument();
+    expect(screen.getByText('Wallet')).toBeInTheDocument();
     expect(screen.getByText('Network')).toBeInTheDocument();
+    expect(screen.getByText('Domains')).toBeInTheDocument();
+    expect(screen.getByText('Projects')).toBeInTheDocument();
+  });
+
+  it('shows recent activity sections', () => {
+    render(<Dashboard />);
     expect(screen.getByText('Recent Domains')).toBeInTheDocument();
     expect(screen.getByText('Favorite Projects')).toBeInTheDocument();
   });

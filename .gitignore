@@ -10,6 +10,8 @@ coverage/
 !.env.example
 .DS_Store
 *.log
+docs/.docusaurus/
+docs/build/
 
 # CI: re-add when gh token has workflow scope
 .github/workflows/

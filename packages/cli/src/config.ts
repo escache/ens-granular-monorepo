@@ -112,9 +112,3 @@ export const config = {
   }
 };
 
-// Validate configuration on import
-try {
-  config.validate();
-} catch (error) {
-  // Configuration validation will be handled when commands are executed
-}

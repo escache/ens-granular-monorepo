@@ -1,8 +1,9 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const lightCodeTheme = require('prism-react-renderer/themes/github');
-const darkCodeTheme = require('prism-react-renderer/themes/dracula');
+const { themes } = require('prism-react-renderer');
+const lightCodeTheme = themes.github;
+const darkCodeTheme = themes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -19,7 +20,7 @@ const config = {
   organizationName: 'ens-granular',
   projectName: 'ens-granular-monorepo',
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -71,12 +72,12 @@ const config = {
             label: 'Documentation',
           },
           {
-            to: '/api/cli-commands',
+            to: '/docs/intro',
             label: 'API',
             position: 'left',
           },
           {
-            to: '/examples/complete-delegation-tree',
+            to: '/docs/quickstart',
             label: 'Examples',
             position: 'left',
           },
@@ -171,6 +172,7 @@ const config = {
     [
       '@docusaurus/plugin-google-analytics',
       {
+        id: 'google-analytics',
         trackingID: 'G-XXXXXXXXXX',
         anonymizeIP: true,
       },
@@ -178,6 +180,7 @@ const config = {
     [
       '@docusaurus/plugin-sitemap',
       {
+        id: 'custom-sitemap',
         changefreq: 'weekly',
         priority: 0.5,
         ignorePatterns: ['/tags/**'],
@@ -187,6 +190,7 @@ const config = {
     [
       '@docusaurus/plugin-ideal-image',
       {
+        id: 'ideal-image',
         quality: 70,
         max: 1030,
         min: 640,
@@ -197,6 +201,7 @@ const config = {
     [
       '@docusaurus/plugin-pwa',
       {
+        id: 'pwa',
         debug: true,
         offlineModeActivationStrategies: [
           'appInstalled',

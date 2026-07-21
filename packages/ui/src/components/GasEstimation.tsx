@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useEstimateGas, useChainId } from 'wagmi';
-import { formatUnits } from 'viem';
+import { encodeFunctionData, formatUnits } from 'viem';
 
 interface GasEstimationProps {
   address?: `0x${string}`;
-  abi: any[];
+  abi: readonly unknown[] | unknown[];
   functionName: string;
-  args?: any[];
+  args?: readonly unknown[];
   enabled?: boolean;
 }
 
@@ -14,13 +14,24 @@ export function GasEstimation({ address, abi, functionName, args, enabled = true
   const chainId = useChainId();
   const [gasPrice, setGasPrice] = useState<bigint | null>(null);
 
+  const callData = useMemo(() => {
+    if (!address || !enabled) return undefined;
+    try {
+      return encodeFunctionData({
+        abi: abi as readonly unknown[],
+        functionName,
+        args: args ?? [],
+      });
+    } catch {
+      return undefined;
+    }
+  }, [address, abi, functionName, args, enabled]);
+
   const { data: gasEstimate, isLoading, error } = useEstimateGas({
-    address,
-    abi,
-    functionName,
-    args,
+    to: address,
+    data: callData,
     query: {
-      enabled: enabled && !!address && !!args,
+      enabled: enabled && !!address && !!callData,
     },
   });
 
@@ -74,4 +85,3 @@ export function GasEstimation({ address, abi, functionName, args, enabled = true
     </div>
   );
 }
-

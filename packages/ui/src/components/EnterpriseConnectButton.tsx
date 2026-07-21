@@ -8,6 +8,8 @@ interface EnterpriseConnectButtonProps {
   connectors: readonly Connector[];
   connect: ({ connector }: { connector: Connector }) => void;
   disconnect: () => void;
+  isPending?: boolean;
+  error?: Error | null;
 }
 
 export function EnterpriseConnectButton({
@@ -16,6 +18,8 @@ export function EnterpriseConnectButton({
   connectors,
   connect,
   disconnect,
+  isPending = false,
+  error = null,
 }: EnterpriseConnectButtonProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showConnectorOptions, setShowConnectorOptions] = useState(false);
@@ -68,30 +72,41 @@ export function EnterpriseConnectButton({
     <div className="relative">
       <button
         onClick={() => setShowConnectorOptions(!showConnectorOptions)}
-        className="enterprise-btn-primary px-3 py-1 text-xs"
+        disabled={isPending}
+        className="enterprise-btn-primary px-3 py-1 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Connect Wallet
+        {isPending ? 'Connecting...' : 'Connect Wallet'}
       </button>
       
       {showConnectorOptions && (
-        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-300 shadow-sm z-50">
+        <div className="absolute right-0 mt-1 w-56 bg-white border border-gray-300 shadow-sm z-50">
           <div className="p-2 border-b border-gray-200">
             <p className="text-xs text-gray-600">Select Wallet</p>
           </div>
-          {connectors.map((connector) => (
-            <button
-              key={connector.id}
-              onClick={() => {
-                connect({ connector });
-                setShowConnectorOptions(false);
-              }}
-              disabled={!connector.ready}
-              className="w-full text-left px-2 py-1 text-xs hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {connector.name}
-              {!connector.ready && ' (unavailable)'}
-            </button>
-          ))}
+          {connectors.length === 0 ? (
+            <p className="px-2 py-2 text-xs text-gray-500">
+              No wallets detected. Install MetaMask or another Web3 wallet.
+            </p>
+          ) : (
+            connectors.map((connector) => (
+              <button
+                key={connector.uid}
+                onClick={() => {
+                  connect({ connector });
+                  setShowConnectorOptions(false);
+                }}
+                disabled={isPending}
+                className="w-full text-left px-2 py-1 text-xs hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {connector.name}
+              </button>
+            ))
+          )}
+          {error && (
+            <p className="px-2 py-2 text-xs text-red-600 border-t border-gray-200">
+              {error.message}
+            </p>
+          )}
         </div>
       )}
     </div>

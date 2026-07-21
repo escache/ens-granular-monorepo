@@ -56,11 +56,11 @@ function TreeNode({ node, depth, expanded, onToggle, activePermissions }: TreeNo
         )}
         
         {/* Category status */}
-        {hasChildren && categoryStatus && (
+        {hasChildren && categoryStatus ? (
           <span className="category-status">
             [{categoryStatus.enabled}/{categoryStatus.total}]
           </span>
-        )}
+        ) : null}
         
         {/* Node name */}
         <span className={`node-name ${hasChildren ? 'category' : ''}`}>
@@ -68,11 +68,11 @@ function TreeNode({ node, depth, expanded, onToggle, activePermissions }: TreeNo
         </span>
         
         {/* Permission value (hex) */}
-        {node.value && (
+        {node.value != null && node.value > 0n ? (
           <span className="permission-value">
             (0x{node.value.toString(16).toUpperCase()})
           </span>
-        )}
+        ) : null}
         
         {/* Description */}
         {node.description && (

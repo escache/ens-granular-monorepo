@@ -29,7 +29,7 @@ export function FactoryOperations({ onDelegateSelect, onGranularDelegateSelect }
   
   const error = writeError || confirmError;
 
-  const { data: allProjects } = useReadContract({
+  const { data: allProjectsData } = useReadContract({
     address: factoryAddress,
     abi: factoryABI,
     functionName: 'getAllProjects',
@@ -37,6 +37,8 @@ export function FactoryOperations({ onDelegateSelect, onGranularDelegateSelect }
       enabled: !!factoryAddress,
     },
   });
+
+  const allProjects = Array.isArray(allProjectsData) ? allProjectsData as string[] : [];
 
   useEffect(() => {
     if (address && !ownerAddress) {

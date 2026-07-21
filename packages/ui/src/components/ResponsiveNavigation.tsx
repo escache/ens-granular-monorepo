@@ -46,9 +46,9 @@ export function ResponsiveNavigation({ tabs, activeTab, onTabChange }: Responsiv
       const navWidth = navRef.current.offsetWidth;
       const moreButtonWidth = 120; // Approximate width of "More" button
       const tabPadding = 16; // Extra padding between tabs
-      let availableWidth = navWidth - moreButtonWidth;
-      let visible: Tab[] = [];
-      let overflow: Tab[] = [];
+      const availableWidth = navWidth - moreButtonWidth;
+      const visible: Tab[] = [];
+      const overflow: Tab[] = [];
       let currentWidth = 0;
 
       // Create temporary elements to measure tab widths
