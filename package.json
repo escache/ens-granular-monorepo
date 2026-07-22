@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspace=docs",
+    "dev:ui": "npm run dev --workspace=@ens-granular/ui",
     "docs:build": "npm run build --workspace=docs",
     "docs:serve": "npm run serve --workspace=docs",
     "docs:start": "npm run start --workspace=docs",
