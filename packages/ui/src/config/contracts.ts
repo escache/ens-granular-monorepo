@@ -1,5 +1,12 @@
 import { Address } from 'viem';
 
+const zero = '0x0000000000000000000000000000000000000000' as Address;
+
+function envAddress(key: string, fallback: Address): Address {
+  const value = import.meta.env[key];
+  return (value && value.startsWith('0x') ? value : fallback) as Address;
+}
+
 export const CONTRACT_ADDRESSES: Record<number, {
   factory: Address;
   nameWrapper: Address;
@@ -9,16 +16,18 @@ export const CONTRACT_ADDRESSES: Record<number, {
   granularResolver?: Address;
 }> = {
   1: {
-    factory: '0x0000000000000000000000000000000000000000', // Update with deployed address
+    factory: envAddress('VITE_FACTORY_ADDRESS_MAINNET', zero),
     nameWrapper: '0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401',
     ensRegistry: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e',
     publicResolver: '0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41',
+    granularResolver: envAddress('VITE_GRANULAR_RESOLVER_MAINNET', zero),
   },
   11155111: {
-    factory: '0x0000000000000000000000000000000000000000', // Update with deployed address
+    factory: envAddress('VITE_FACTORY_ADDRESS_SEPOLIA', zero),
     nameWrapper: '0x0635513f179D50A207757E05759CbD106d7dFcE8',
     ensRegistry: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e',
     publicResolver: '0x8FADE66B79cC9f707aB26799354482EB93a5B7dD',
+    granularResolver: envAddress('VITE_GRANULAR_RESOLVER_SEPOLIA', zero),
   },
   31337: {
     factory: '0xe2A04F5d91D1AD137f854C5820C76e5b711158c5',
@@ -57,4 +66,3 @@ export const PERMISSION_NAMES: Record<string, string> = {
   '512': 'Set Owner',
   '1024': 'Set Fuses',
 };
-

@@ -1,7 +1,9 @@
 import { Command } from 'commander';
+import { Address } from 'viem';
 import { getPublicClient, getWalletClient } from '../config';
 import { displaySuccess, displayError, displayInfo, waitForTransaction, validateDomain, validateAddress } from '../utils/helpers';
-import { Address, Hex } from 'viem';
+import { domainToNode, resolveDelegateAddress } from '../utils/contracts';
+import { DELEGATE_ABI } from '../abis';
 
 const program = new Command();
 
@@ -16,35 +18,28 @@ program
   .option('-p, --primary <address>', 'Primary delegate address')
   .option('-s, --secondary <address>', 'Secondary delegate address')
   .option('-e, --expires <timestamp>', 'Expiration timestamp (0 for no expiration)')
-  .action(async (domain: string, options: { primary?: string; secondary?: string; expires?: string }) => {
+  .option('-d, --delegate <address>', 'Basic delegate contract address')
+  .action(async (domain: string, options: { primary?: string; secondary?: string; expires?: string; delegate?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
-      
-      if (!options.primary) {
-        throw new Error('Primary delegate address is required');
-      }
-      
+      if (!options.primary) throw new Error('Primary delegate address is required');
+
       const primaryAddress = validateAddress(options.primary);
-      const secondaryAddress = options.secondary ? validateAddress(options.secondary) : undefined;
+      const secondaryAddress = options.secondary ? validateAddress(options.secondary) : '0x0000000000000000000000000000000000000000' as Address;
       const expires = options.expires ? BigInt(options.expires) : 0n;
-      
-      const publicClient = getPublicClient();
+      const delegateContract = resolveDelegateAddress(options.delegate);
       const walletClient = getWalletClient();
-      
+      const node = domainToNode(normalizedDomain);
+
       displayInfo(`Setting delegation for ${normalizedDomain}...`);
-      displayInfo(`Primary: ${primaryAddress}`);
-      if (secondaryAddress) {
-        displayInfo(`Secondary: ${secondaryAddress}`);
-      }
-      if (expires > 0n) {
-        displayInfo(`Expires: ${new Date(Number(expires) * 1000).toISOString()}`);
-      }
-      
-      // TODO: Implement delegation contract interaction
-      // This would call the delegate contract's setDelegation function
-      
+      const hash = await walletClient.writeContract({
+        address: delegateContract,
+        abi: DELEGATE_ABI,
+        functionName: 'setDelegation',
+        args: [node, primaryAddress, secondaryAddress, expires],
+      });
+      await waitForTransaction(hash);
       displaySuccess(`Delegation set for ${normalizedDomain}`);
-      
     } catch (error) {
       displayError(`Failed to set delegation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
@@ -55,18 +50,26 @@ program
   .command('get')
   .description('Get delegation information for a domain')
   .argument('<domain>', 'Domain name to check')
-  .action(async (domain: string) => {
+  .option('-d, --delegate <address>', 'Basic delegate contract address')
+  .action(async (domain: string, options: { delegate?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
       const publicClient = getPublicClient();
-      
-      displayInfo(`Getting delegation info for ${normalizedDomain}...`);
-      
-      // TODO: Implement delegation lookup
-      // This would call the delegate contract's getDelegation function
-      
-      displayInfo('Delegation info: [TO BE IMPLEMENTED]');
-      
+      const delegateContract = resolveDelegateAddress(options.delegate);
+      const node = domainToNode(normalizedDomain);
+
+      const delegation = await publicClient.readContract({
+        address: delegateContract,
+        abi: DELEGATE_ABI,
+        functionName: 'getDelegation',
+        args: [node],
+      }) as { primaryDelegate: Address; secondaryDelegate: Address; expiresAt: bigint; isActive: boolean };
+
+      displayInfo(`Delegation for ${normalizedDomain}:`);
+      displayInfo(`  Primary:   ${delegation.primaryDelegate}`);
+      displayInfo(`  Secondary: ${delegation.secondaryDelegate}`);
+      displayInfo(`  Expires:   ${delegation.expiresAt.toString()}`);
+      displayInfo(`  Active:    ${delegation.isActive}`);
     } catch (error) {
       displayError(`Failed to get delegation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
@@ -77,19 +80,22 @@ program
   .command('revoke')
   .description('Revoke delegation for a domain')
   .argument('<domain>', 'Domain name to revoke delegation for')
-  .action(async (domain: string) => {
+  .option('-d, --delegate <address>', 'Basic delegate contract address')
+  .action(async (domain: string, options: { delegate?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
-      const publicClient = getPublicClient();
       const walletClient = getWalletClient();
-      
-      displayInfo(`Revoking delegation for ${normalizedDomain}...`);
-      
-      // TODO: Implement delegation revocation
-      // This would call the delegate contract's revokeDelegation function
-      
+      const delegateContract = resolveDelegateAddress(options.delegate);
+      const node = domainToNode(normalizedDomain);
+
+      const hash = await walletClient.writeContract({
+        address: delegateContract,
+        abi: DELEGATE_ABI,
+        functionName: 'revokeDelegation',
+        args: [node],
+      });
+      await waitForTransaction(hash);
       displaySuccess(`Delegation revoked for ${normalizedDomain}`);
-      
     } catch (error) {
       displayError(`Failed to revoke delegation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
@@ -98,22 +104,26 @@ program
 
 program
   .command('check')
-  .description('Check if an address has delegation permissions')
+  .description('Check if an address is authorized on a domain')
   .argument('<domain>', 'Domain name to check')
   .argument('<address>', 'Address to check permissions for')
-  .action(async (domain: string, address: string) => {
+  .option('-d, --delegate <address>', 'Basic delegate contract address')
+  .action(async (domain: string, address: string, options: { delegate?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
       const checkAddress = validateAddress(address);
       const publicClient = getPublicClient();
-      
-      displayInfo(`Checking permissions for ${checkAddress} on ${normalizedDomain}...`);
-      
-      // TODO: Implement permission checking
-      // This would call the delegate contract's hasPermission function
-      
-      displayInfo('Permission status: [TO BE IMPLEMENTED]');
-      
+      const delegateContract = resolveDelegateAddress(options.delegate);
+      const node = domainToNode(normalizedDomain);
+
+      const authorized = await publicClient.readContract({
+        address: delegateContract,
+        abi: DELEGATE_ABI,
+        functionName: 'isAuthorizedDelegate',
+        args: [node, checkAddress],
+      });
+
+      displayInfo(`Authorization for ${checkAddress} on ${normalizedDomain}: ${authorized ? 'yes' : 'no'}`);
     } catch (error) {
       displayError(`Failed to check permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
@@ -124,40 +134,31 @@ program
   .command('create-subdomain')
   .description('Create a subdomain via delegation')
   .argument('<domain>', 'Parent domain name')
-  .argument('<subdomain>', 'Subdomain name to create')
+  .argument('<subdomain>', 'Subdomain label to create')
   .option('-o, --owner <address>', 'Owner address for the subdomain')
   .option('-r, --resolver <address>', 'Resolver address for the subdomain')
   .option('-t, --ttl <seconds>', 'TTL for the subdomain')
-  .action(async (domain: string, subdomain: string, options: { owner?: string; resolver?: string; ttl?: string }) => {
+  .option('-d, --delegate <address>', 'Basic delegate contract address')
+  .action(async (domain: string, subdomain: string, options: { owner?: string; resolver?: string; ttl?: string; delegate?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
-      const normalizedSubdomain = subdomain.toLowerCase();
-      
-      if (!options.owner) {
-        throw new Error('Owner address is required');
-      }
-      
+      if (!options.owner) throw new Error('Owner address is required');
+
       const ownerAddress = validateAddress(options.owner);
-      const resolverAddress = options.resolver ? validateAddress(options.resolver) : undefined;
+      const resolverAddress = options.resolver ? validateAddress(options.resolver) : '0x0000000000000000000000000000000000000000' as Address;
       const ttl = options.ttl ? BigInt(options.ttl) : 0n;
-      
-      const publicClient = getPublicClient();
       const walletClient = getWalletClient();
-      
-      displayInfo(`Creating subdomain ${normalizedSubdomain}.${normalizedDomain}...`);
-      displayInfo(`Owner: ${ownerAddress}`);
-      if (resolverAddress) {
-        displayInfo(`Resolver: ${resolverAddress}`);
-      }
-      if (ttl > 0n) {
-        displayInfo(`TTL: ${ttl} seconds`);
-      }
-      
-      // TODO: Implement subdomain creation via delegation
-      // This would call the delegate contract's createSubdomain function
-      
-      displaySuccess(`Subdomain ${normalizedSubdomain}.${normalizedDomain} created`);
-      
+      const delegateContract = resolveDelegateAddress(options.delegate);
+      const node = domainToNode(normalizedDomain);
+
+      const hash = await walletClient.writeContract({
+        address: delegateContract,
+        abi: DELEGATE_ABI,
+        functionName: 'createSubdomain',
+        args: [node, subdomain.toLowerCase(), ownerAddress, resolverAddress, ttl],
+      });
+      await waitForTransaction(hash);
+      displaySuccess(`Subdomain ${subdomain}.${normalizedDomain} created`);
     } catch (error) {
       displayError(`Failed to create subdomain: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);

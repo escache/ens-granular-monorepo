@@ -1,7 +1,9 @@
 import { Command } from 'commander';
+import { Address } from 'viem';
 import { getPublicClient, getWalletClient } from '../config';
 import { displaySuccess, displayError, displayInfo, waitForTransaction, validateDomain, validateAddress } from '../utils/helpers';
-import { Address, Hex } from 'viem';
+import { domainToNode, resolveGranularAddress, parseOperationsBitmask } from '../utils/contracts';
+import { GRANULAR_ABI } from '../abis';
 
 const program = new Command();
 
@@ -9,35 +11,36 @@ program
   .name('granular')
   .description('Granular delegation operations with fine-grained permissions');
 
+function getGranularContract(option?: string) {
+  return resolveGranularAddress(option);
+}
+
 program
   .command('add')
   .description('Add a delegate with specific permissions')
   .argument('<domain>', 'Domain name to add delegate for')
   .argument('<address>', 'Delegate address to add')
-  .option('-o, --operations <bitmask>', 'Operations bitmask (1=create, 2=setOwner, 4=setResolver, 8=setTTL)')
+  .option('-o, --operations <bitmask>', 'Permission bitmask or comma-separated names (e.g., SET_TEXT_RECORD,4)')
   .option('-e, --expires <timestamp>', 'Expiration timestamp (0 for no expiration)')
-  .action(async (domain: string, address: string, options: { operations?: string; expires?: string }) => {
+  .option('-g, --granular <address>', 'Granular delegate contract address')
+  .action(async (domain: string, address: string, options: { operations?: string; expires?: string; granular?: string }) => {
     try {
       const normalizedDomain = validateDomain(domain);
       const delegateAddress = validateAddress(address);
-      const operations = options.operations ? BigInt(options.operations) : 1n;
+      const operations = parseOperationsBitmask(options.operations);
       const expires = options.expires ? BigInt(options.expires) : 0n;
-      
-      const publicClient = getPublicClient();
       const walletClient = getWalletClient();
-      
-      displayInfo(`Adding granular delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      displayInfo(`Operations: ${operations}`);
-      if (expires > 0n) {
-        displayInfo(`Expires: ${new Date(Number(expires) * 1000).toISOString()}`);
-      }
-      
-      // TODO: Implement granular delegate addition
-      // This would call the granular delegate contract's addDelegate function
-      
+      const granularContract = getGranularContract(options.granular);
+      const node = domainToNode(normalizedDomain);
+
+      const hash = await walletClient.writeContract({
+        address: granularContract,
+        abi: GRANULAR_ABI,
+        functionName: 'addDelegate',
+        args: [node, delegateAddress, operations, expires],
+      });
+      await waitForTransaction(hash);
       displaySuccess(`Granular delegate added for ${normalizedDomain}`);
-      
     } catch (error) {
       displayError(`Failed to add granular delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
@@ -47,226 +50,146 @@ program
 program
   .command('remove')
   .description('Remove a granular delegate')
-  .argument('<domain>', 'Domain name to remove delegate from')
+  .argument('<domain>', 'Domain name')
   .argument('<address>', 'Delegate address to remove')
-  .action(async (domain: string, address: string) => {
+  .option('-g, --granular <address>', 'Granular delegate contract address')
+  .action(async (domain: string, address: string, options: { granular?: string }) => {
     try {
-      const normalizedDomain = validateDomain(domain);
-      const delegateAddress = validateAddress(address);
-      
-      const publicClient = getPublicClient();
       const walletClient = getWalletClient();
-      
-      displayInfo(`Removing granular delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      
-      // TODO: Implement granular delegate removal
-      // This would call the granular delegate contract's removeDelegate function
-      
-      displaySuccess(`Granular delegate removed for ${normalizedDomain}`);
-      
+      const granularContract = getGranularContract(options.granular);
+      const node = domainToNode(validateDomain(domain));
+      const delegateAddress = validateAddress(address);
+
+      const hash = await walletClient.writeContract({
+        address: granularContract,
+        abi: GRANULAR_ABI,
+        functionName: 'removeDelegate',
+        args: [node, delegateAddress],
+      });
+      await waitForTransaction(hash);
+      displaySuccess(`Granular delegate removed`);
     } catch (error) {
       displayError(`Failed to remove granular delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
 
-program
-  .command('lock')
-  .description('Lock a delegate to prevent removal')
-  .argument('<domain>', 'Domain name')
-  .argument('<address>', 'Delegate address to lock')
-  .action(async (domain: string, address: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const delegateAddress = validateAddress(address);
-      
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Locking delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      
-      // TODO: Implement delegate locking
-      // This would call the granular delegate contract's lockDelegate function
-      
-      displaySuccess(`Delegate locked for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to lock delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
+['lock', 'unlock', 'enable', 'disable'].forEach((action) => {
+  program
+    .command(action)
+    .description(`${action.charAt(0).toUpperCase()}${action.slice(1)} a granular delegate`)
+    .argument('<domain>', 'Domain name')
+    .argument('<address>', 'Delegate address')
+    .option('-g, --granular <address>', 'Granular delegate contract address')
+    .action(async (domain: string, address: string, options: { granular?: string }) => {
+      try {
+        const walletClient = getWalletClient();
+        const granularContract = getGranularContract(options.granular);
+        const node = domainToNode(validateDomain(domain));
+        const delegateAddress = validateAddress(address);
+        const fn = `${action}Delegate` as 'lockDelegate' | 'unlockDelegate' | 'enableDelegate' | 'disableDelegate';
 
-program
-  .command('unlock')
-  .description('Unlock a delegate to allow removal')
-  .argument('<domain>', 'Domain name')
-  .argument('<address>', 'Delegate address to unlock')
-  .action(async (domain: string, address: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const delegateAddress = validateAddress(address);
-      
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Unlocking delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      
-      // TODO: Implement delegate unlocking
-      // This would call the granular delegate contract's unlockDelegate function
-      
-      displaySuccess(`Delegate unlocked for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to unlock delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command('enable')
-  .description('Enable a delegate')
-  .argument('<domain>', 'Domain name')
-  .argument('<address>', 'Delegate address to enable')
-  .action(async (domain: string, address: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const delegateAddress = validateAddress(address);
-      
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Enabling delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      
-      // TODO: Implement delegate enabling
-      // This would call the granular delegate contract's enableDelegate function
-      
-      displaySuccess(`Delegate enabled for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to enable delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command('disable')
-  .description('Disable a delegate')
-  .argument('<domain>', 'Domain name')
-  .argument('<address>', 'Delegate address to disable')
-  .action(async (domain: string, address: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const delegateAddress = validateAddress(address);
-      
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Disabling delegate for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegateAddress}`);
-      
-      // TODO: Implement delegate disabling
-      // This would call the granular delegate contract's disableDelegate function
-      
-      displaySuccess(`Delegate disabled for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to disable delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
+        const hash = await walletClient.writeContract({
+          address: granularContract,
+          abi: GRANULAR_ABI,
+          functionName: fn,
+          args: [node, delegateAddress],
+        });
+        await waitForTransaction(hash);
+        displaySuccess(`Delegate ${action}d`);
+      } catch (error) {
+        displayError(`Failed to ${action} delegate: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        process.exit(1);
+      }
+    });
+});
 
 program
   .command('list')
   .description('List all granular delegates for a domain')
-  .argument('<domain>', 'Domain name to list delegates for')
-  .action(async (domain: string) => {
+  .argument('<domain>', 'Domain name')
+  .option('-g, --granular <address>', 'Granular delegate contract address')
+  .action(async (domain: string, options: { granular?: string }) => {
     try {
-      const normalizedDomain = validateDomain(domain);
       const publicClient = getPublicClient();
-      
-      displayInfo(`Listing granular delegates for ${normalizedDomain}...`);
-      
-      // TODO: Implement delegate listing
-      // This would call the granular delegate contract's getAllDelegates function
-      
-      displayInfo('Granular delegates: [TO BE IMPLEMENTED]');
-      
+      const granularContract = getGranularContract(options.granular);
+      const node = domainToNode(validateDomain(domain));
+
+      const delegates = await publicClient.readContract({
+        address: granularContract,
+        abi: GRANULAR_ABI,
+        functionName: 'getAllDelegates',
+        args: [node],
+      }) as Address[];
+
+      if (delegates.length === 0) {
+        displayInfo('No delegates configured');
+        return;
+      }
+
+      for (const delegate of delegates) {
+        const info = await publicClient.readContract({
+          address: granularContract,
+          abi: GRANULAR_ABI,
+          functionName: 'getDelegateInfo',
+          args: [node, delegate],
+        }) as { allowedOperations: bigint; expiresAt: bigint; enabled: boolean; locked: boolean };
+
+        displayInfo(`${delegate}`);
+        displayInfo(`  operations=${info.allowedOperations.toString()} enabled=${info.enabled} locked=${info.locked}`);
+      }
     } catch (error) {
       displayError(`Failed to list delegates: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
 
-program
-  .command('whitelist')
-  .description('Manage whitelist for granular delegates')
-  .argument('<domain>', 'Domain name')
-  .argument('<action>', 'Action: add, remove, toggle, list')
-  .argument('[address]', 'Address to add/remove (not needed for toggle/list)')
-  .action(async (domain: string, action: string, address?: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Managing whitelist for ${normalizedDomain}...`);
-      displayInfo(`Action: ${action}`);
-      
-      if (action === 'add' || action === 'remove') {
-        if (!address) {
-          throw new Error('Address is required for add/remove actions');
-        }
-        const delegateAddress = validateAddress(address);
-        displayInfo(`Address: ${delegateAddress}`);
-      }
-      
-      // TODO: Implement whitelist management
-      // This would call the granular delegate contract's whitelist functions
-      
-      displaySuccess(`Whitelist ${action} completed for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to manage whitelist: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
+function listCommand(kind: 'whitelist' | 'blacklist') {
+  program
+    .command(kind)
+    .description(`Manage ${kind} for granular delegates`)
+    .argument('<domain>', 'Domain name')
+    .argument('<action>', 'Action: add, remove, toggle')
+    .argument('[address]', 'Address to add/remove')
+    .option('-g, --granular <address>', 'Granular delegate contract address')
+    .action(async (domain: string, action: string, address: string | undefined, options: { granular?: string }) => {
+      try {
+        const walletClient = getWalletClient();
+        const granularContract = getGranularContract(options.granular);
+        const node = domainToNode(validateDomain(domain));
 
-program
-  .command('blacklist')
-  .description('Manage blacklist for granular delegates')
-  .argument('<domain>', 'Domain name')
-  .argument('<action>', 'Action: add, remove, toggle, list')
-  .argument('[address]', 'Address to add/remove (not needed for toggle/list)')
-  .action(async (domain: string, action: string, address?: string) => {
-    try {
-      const normalizedDomain = validateDomain(domain);
-      const publicClient = getPublicClient();
-      const walletClient = getWalletClient();
-      
-      displayInfo(`Managing blacklist for ${normalizedDomain}...`);
-      displayInfo(`Action: ${action}`);
-      
-      if (action === 'add' || action === 'remove') {
-        if (!address) {
-          throw new Error('Address is required for add/remove actions');
+        if (action === 'toggle') {
+          const hash = await walletClient.writeContract({
+            address: granularContract,
+            abi: GRANULAR_ABI,
+            functionName: kind === 'whitelist' ? 'toggleWhitelist' : 'toggleBlacklist',
+            args: [node, true],
+          });
+          await waitForTransaction(hash);
+          displaySuccess(`${kind} toggled`);
+          return;
         }
+
+        if (!address) throw new Error('Address is required for add/remove actions');
         const delegateAddress = validateAddress(address);
-        displayInfo(`Address: ${delegateAddress}`);
+        const added = action === 'add';
+
+        const hash = await walletClient.writeContract({
+          address: granularContract,
+          abi: GRANULAR_ABI,
+          functionName: kind === 'whitelist' ? 'updateWhitelist' : 'updateBlacklist',
+          args: [node, delegateAddress, added],
+        });
+        await waitForTransaction(hash);
+        displaySuccess(`${kind} ${action} completed`);
+      } catch (error) {
+        displayError(`Failed to manage ${kind}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        process.exit(1);
       }
-      
-      // TODO: Implement blacklist management
-      // This would call the granular delegate contract's blacklist functions
-      
-      displaySuccess(`Blacklist ${action} completed for ${normalizedDomain}`);
-      
-    } catch (error) {
-      displayError(`Failed to manage blacklist: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      process.exit(1);
-    }
-  });
+    });
+}
+
+listCommand('whitelist');
+listCommand('blacklist');
 
 export default program;

@@ -6,15 +6,15 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./IndexedENSManager.sol";
 import "./IndexedGranularResolver.sol";
+import "./interfaces/IIndexedENSDeployer.sol";
 
 /**
  * @title IndexedENSManagerFactory
  * @dev Factory contract for deploying indexed ENS management systems
- * @notice Enables project isolation with gas-indexed indexed storage
+ * @notice Uses an external deployer to stay under the 24KB bytecode limit
  */
 contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
     
-    // Struct to hold project information
     struct Project {
         address manager;
         address resolver;
@@ -26,19 +26,13 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
         uint16 totalDelegates;
     }
 
-    // Mapping from project name to project info
+    address public immutable deployer;
+
     mapping(string => Project) public projects;
-    
-    // Mapping from manager address to project name
     mapping(address => string) public managerToProject;
-    
-    // Mapping from resolver address to project name
     mapping(address => string) public resolverToProject;
-    
-    // Array of all project names
     string[] public projectNames;
     
-    // Events
     event ProjectCreated(
         string indexed projectName,
         address indexed owner,
@@ -46,8 +40,13 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
         address resolver
     );
     
-    event ProjectDeactivated(string indexed projectName);
+    event ProjectOwnershipTransferred(
+        string indexed projectName,
+        address indexed previousOwner,
+        address indexed newOwner
+    );
     
+    event ProjectDeactivated(string indexed projectName);
     event ProjectReactivated(string indexed projectName);
     
     event ManagerUpgraded(
@@ -62,7 +61,6 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
         address indexed newResolver
     );
 
-    // Modifiers
     modifier onlyProjectOwner(string memory projectName) {
         require(
             projects[projectName].owner == msg.sender,
@@ -79,34 +77,25 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
         _;
     }
 
-    /**
-     * @dev Constructor
-     */
-    constructor() {}
+    constructor(address _deployer) {
+        require(_deployer != address(0), "Invalid deployer");
+        deployer = _deployer;
+    }
 
-    /**
-     * @dev Create a new project with indexed ENS management
-     * @param projectName The name of the project
-     * @return manager The deployed manager contract address
-     * @return resolver The deployed resolver contract address
-     */
-    function createProject(string calldata projectName) external onlyOwner returns (address manager, address resolver) {
+    function createProject(
+        string calldata projectName,
+        address owner
+    ) external onlyOwner nonReentrant whenNotPaused returns (address manager, address resolver) {
         require(bytes(projectName).length > 0, "Project name cannot be empty");
+        require(owner != address(0), "Owner cannot be zero address");
         require(projects[projectName].owner == address(0), "Project already exists");
+
+        (manager, resolver) = IIndexedENSDeployer(deployer).deployProject(owner);
         
-        // Deploy IndexedENSManager
-        IndexedENSManager newManager = new IndexedENSManager();
-        manager = address(newManager);
-        
-        // Deploy IndexedGranularResolver
-        IndexedGranularResolver newResolver = new IndexedGranularResolver(manager);
-        resolver = address(newResolver);
-        
-        // Store project information
         projects[projectName] = Project({
             manager: manager,
             resolver: resolver,
-            owner: msg.sender,
+            owner: owner,
             name: projectName,
             createdAt: uint32(block.timestamp),
             isActive: true,
@@ -114,136 +103,96 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
             totalDelegates: 0
         });
         
-        // Update reverse mappings
         managerToProject[manager] = projectName;
         resolverToProject[resolver] = projectName;
         projectNames.push(projectName);
         
-        emit ProjectCreated(projectName, msg.sender, manager, resolver);
+        emit ProjectCreated(projectName, owner, manager, resolver);
     }
 
-    /**
-     * @dev Deactivate a project
-     * @param projectName The name of the project
-     */
+    function transferProjectOwnership(
+        string calldata projectName,
+        address newOwner
+    ) external onlyProjectOwner(projectName) onlyValidProject(projectName) {
+        require(newOwner != address(0), "New owner cannot be zero address");
+
+        Project storage project = projects[projectName];
+        address previousOwner = project.owner;
+        project.owner = newOwner;
+
+        IndexedENSManager(project.manager).transferOwnership(newOwner);
+        IndexedGranularResolver(project.resolver).transferOwnership(newOwner);
+
+        emit ProjectOwnershipTransferred(projectName, previousOwner, newOwner);
+    }
+
     function deactivateProject(string calldata projectName) external onlyProjectOwner(projectName) onlyValidProject(projectName) {
         projects[projectName].isActive = false;
         emit ProjectDeactivated(projectName);
     }
 
-    /**
-     * @dev Reactivate a project
-     * @param projectName The name of the project
-     */
     function reactivateProject(string calldata projectName) external onlyProjectOwner(projectName) {
         require(projects[projectName].owner != address(0), "Project does not exist");
         projects[projectName].isActive = true;
         emit ProjectReactivated(projectName);
     }
 
-    /**
-     * @dev Upgrade manager for a project
-     * @param projectName The name of the project
-     * @return newManager The new manager contract address
-     */
     function upgradeManager(string calldata projectName) external onlyProjectOwner(projectName) onlyValidProject(projectName) returns (address newManager) {
-        address oldManager = projects[projectName].manager;
+        Project storage project = projects[projectName];
+        address oldManager = project.manager;
+        address owner = project.owner;
         
-        // Deploy new manager
-        IndexedENSManager newManagerContract = new IndexedENSManager();
-        newManager = address(newManagerContract);
+        (newManager, ) = IIndexedENSDeployer(deployer).deployProject(owner);
+        project.manager = newManager;
         
-        // Update project
-        projects[projectName].manager = newManager;
-        
-        // Update reverse mapping
         managerToProject[oldManager] = "";
         managerToProject[newManager] = projectName;
         
         emit ManagerUpgraded(projectName, oldManager, newManager);
     }
 
-    /**
-     * @dev Upgrade resolver for a project
-     * @param projectName The name of the project
-     * @return newResolver The new resolver contract address
-     */
     function upgradeResolver(string calldata projectName) external onlyProjectOwner(projectName) onlyValidProject(projectName) returns (address newResolver) {
-        address oldResolver = projects[projectName].resolver;
-        address manager = projects[projectName].manager;
+        Project storage project = projects[projectName];
+        address oldResolver = project.resolver;
+        address owner = project.owner;
+        address manager = project.manager;
         
-        // Deploy new resolver
         IndexedGranularResolver newResolverContract = new IndexedGranularResolver(manager);
+        newResolverContract.transferOwnership(owner);
         newResolver = address(newResolverContract);
         
-        // Update project
-        projects[projectName].resolver = newResolver;
+        project.resolver = newResolver;
         
-        // Update reverse mapping
         resolverToProject[oldResolver] = "";
         resolverToProject[newResolver] = projectName;
         
         emit ResolverUpgraded(projectName, oldResolver, newResolver);
     }
 
-    /**
-     * @dev Get project information
-     * @param projectName The name of the project
-     * @return project The project information
-     */
     function getProject(string calldata projectName) external view returns (Project memory project) {
         return projects[projectName];
     }
 
-    /**
-     * @dev Get all project names
-     * @return names Array of project names
-     */
     function getAllProjectNames() external view returns (string[] memory names) {
         return projectNames;
     }
 
-    /**
-     * @dev Get project count
-     * @return count The total number of projects
-     */
     function getProjectCount() external view returns (uint256 count) {
         return projectNames.length;
     }
 
-    /**
-     * @dev Check if project exists
-     * @param projectName The name of the project
-     * @return exists True if project exists
-     */
     function projectExists(string calldata projectName) external view returns (bool exists) {
         return projects[projectName].owner != address(0);
     }
 
-    /**
-     * @dev Get project by manager address
-     * @param managerAddress The manager contract address
-     * @return projectName The project name
-     */
     function getProjectByManager(address managerAddress) external view returns (string memory projectName) {
         return managerToProject[managerAddress];
     }
 
-    /**
-     * @dev Get project by resolver address
-     * @param resolverAddress The resolver contract address
-     * @return projectName The project name
-     */
     function getProjectByResolver(address resolverAddress) external view returns (string memory projectName) {
         return resolverToProject[resolverAddress];
     }
 
-    /**
-     * @dev Update project statistics
-     * @param projectName The name of the project
-     * @param domainCount The current domain count
-     * @param totalDelegates The total delegate count
-     */
     function updateProjectStats(string calldata projectName, uint8 domainCount, uint16 totalDelegates) external {
         require(projects[projectName].manager == msg.sender, "Only project manager can update stats");
         require(projects[projectName].isActive, "Project not active");
@@ -252,23 +201,14 @@ contract IndexedENSManagerFactory is Ownable, Pausable, ReentrancyGuard {
         projects[projectName].totalDelegates = totalDelegates;
     }
 
-    /**
-     * @dev Pause the factory (emergency function)
-     */
     function pause() external onlyOwner {
         _pause();
     }
 
-    /**
-     * @dev Unpause the factory
-     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
-    /**
-     * @dev Emergency function to recover stuck ETH
-     */
     function emergencyWithdraw() external onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }

@@ -36,7 +36,15 @@ export function EnterpriseApp() {
   const { isConnected, address } = useAccount();
   const { connectors, connect, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
-  const { resolverAddress, setResolverAddress } = useAppContext();
+  const {
+    selectedDelegate,
+    selectedGranularDelegate,
+    resolverAddress,
+    setSelectedDelegate,
+    setSelectedGranularDelegate,
+    setResolverAddress,
+    addRecentDomain,
+  } = useAppContext();
 
   const tabs = [
     { id: 'dashboard' as Tab, label: 'Dashboard' },
@@ -98,20 +106,46 @@ export function EnterpriseApp() {
 
     return (
       <Suspense fallback={<LoadingFallback />}>
+        {(activeTab === 'delegation' || activeTab === 'granular' || activeTab === 'subdomain' ||
+          activeTab === 'acl' || activeTab === 'emergency' || activeTab === 'delegates' ||
+          activeTab === 'security' || activeTab === 'batch') && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              {(activeTab === 'delegation' || activeTab === 'subdomain') && (
+                <>Using delegate: <span className="font-mono">{selectedDelegate || 'None selected'}</span></>
+              )}
+              {(activeTab === 'granular' || activeTab === 'acl' || activeTab === 'emergency' ||
+                activeTab === 'delegates' || activeTab === 'security' || activeTab === 'batch') && (
+                <>Using granular delegate: <span className="font-mono">{selectedGranularDelegate || 'None selected'}</span></>
+              )}
+              {' '}
+              {((activeTab === 'delegation' || activeTab === 'subdomain') && !selectedDelegate) ||
+               ((activeTab === 'granular' || activeTab === 'acl' || activeTab === 'emergency' ||
+                 activeTab === 'delegates' || activeTab === 'security' || activeTab === 'batch') && !selectedGranularDelegate) ? (
+                <span className="text-blue-600">Go to Factory tab to select a delegate</span>
+              ) : null}
+            </p>
+          </div>
+        )}
         {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'factory' && <FactoryOperations />}
-        {activeTab === 'delegation' && <DelegationManagement />}
-        {activeTab === 'granular' && <GranularPermissions />}
+        {activeTab === 'factory' && (
+          <FactoryOperations
+            onDelegateSelect={setSelectedDelegate}
+            onGranularDelegateSelect={setSelectedGranularDelegate}
+          />
+        )}
+        {activeTab === 'delegation' && <DelegationManagement delegateAddress={selectedDelegate} />}
+        {activeTab === 'granular' && <GranularPermissions delegateAddress={selectedGranularDelegate} />}
         {activeTab === 'tree' && <PermissionTreeView />}
-        {activeTab === 'subdomain' && <SubdomainCreation />}
+        {activeTab === 'subdomain' && <SubdomainCreation delegateAddress={selectedDelegate} />}
         {activeTab === 'approval' && <ApprovalManagement />}
-        {activeTab === 'batch' && <BatchOperations />}
-        {activeTab === 'acl' && <AccessControlLists />}
-        {activeTab === 'emergency' && <EmergencyControls />}
-        {activeTab === 'delegates' && <DelegateListView />}
-        {activeTab === 'resolver' && <ResolverManagement />}
-        {activeTab === 'security' && <SecurityDashboard />}
-        {activeTab === 'export' && <ExportImport />}
+        {activeTab === 'batch' && <BatchOperations delegateAddress={selectedGranularDelegate} />}
+        {activeTab === 'acl' && <AccessControlLists delegateAddress={selectedGranularDelegate} />}
+        {activeTab === 'emergency' && <EmergencyControls delegateAddress={selectedGranularDelegate} />}
+        {activeTab === 'delegates' && <DelegateListView delegateAddress={selectedGranularDelegate} />}
+        {activeTab === 'resolver' && <ResolverManagement resolverAddress={resolverAddress} />}
+        {activeTab === 'security' && <SecurityDashboard delegateAddress={selectedGranularDelegate} />}
+        {activeTab === 'export' && <ExportImport delegateAddress={selectedGranularDelegate} />}
         {activeTab === 'addressbook' && <AddressBook />}
         {activeTab === 'history' && <TransactionHistory />}
         {activeTab === 'settings' && (
@@ -119,7 +153,16 @@ export function EnterpriseApp() {
         )}
       </Suspense>
     );
-  }, [activeTab, isConnected, setResolverAddress]);
+  }, [
+    activeTab,
+    isConnected,
+    selectedDelegate,
+    selectedGranularDelegate,
+    resolverAddress,
+    setSelectedDelegate,
+    setSelectedGranularDelegate,
+    setResolverAddress,
+  ]);
 
   return (
     <div className="min-h-screen bg-primary flex flex-col">
@@ -128,7 +171,13 @@ export function EnterpriseApp() {
         <div className="px-lg py-sm flex items-center justify-between">
           <div className="flex items-center gap-lg">
             <h1 className="text-lg font-semibold m-0">ENS Granular Control</h1>
-            <SearchBar />
+            <SearchBar
+              onSelect={(result) => {
+                if (result.type === 'domain') {
+                  addRecentDomain(result.value);
+                }
+              }}
+            />
           </div>
           <div className="flex items-center gap-md">
             <NotificationBadge />

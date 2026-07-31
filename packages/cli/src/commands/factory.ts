@@ -1,7 +1,9 @@
 import { Command } from 'commander';
-import { getPublicClient, getWalletClient } from '../config';
-import { displaySuccess, displayError, displayInfo, waitForTransaction, validateDomain } from '../utils/helpers';
-import { Address, Hex } from 'viem';
+import { Address } from 'viem';
+import { getPublicClient, getWalletClient, config } from '../config';
+import { displaySuccess, displayError, displayInfo, waitForTransaction, validateAddress } from '../utils/helpers';
+import { resolveFactoryAddress } from '../utils/contracts';
+import { FACTORY_ABI } from '../abis';
 
 const program = new Command();
 
@@ -11,67 +13,110 @@ program
 
 program
   .command('create')
-  .description('Create a new delegate contract for a project')
-  .argument('<domain>', 'Domain name for the project (e.g., myproject.eth)')
-  .option('-o, --owner <address>', 'Owner address for the delegate contract')
-  .action(async (domain: string, options: { owner?: string }) => {
+  .description('Create a new delegate contract pair for a project')
+  .argument('<project>', 'Project name (e.g., my-project)')
+  .option('-o, --owner <address>', 'Owner address for the delegate contracts')
+  .option('-f, --factory <address>', 'Factory contract address')
+  .action(async (project: string, options: { owner?: string; factory?: string }) => {
     try {
-      const normalizedDomain = validateDomain(domain);
-      const publicClient = getPublicClient();
+      const factoryAddress = resolveFactoryAddress(options.factory);
       const walletClient = getWalletClient();
-      
-      displayInfo(`Creating delegate contract for ${normalizedDomain}...`);
-      
-      // TODO: Implement factory contract interaction
-      // This would call the factory contract's createDelegate function
-      
-      displaySuccess(`Delegate contract created for ${normalizedDomain}`);
-      displayInfo('Contract address: [TO BE IMPLEMENTED]');
-      
+      if (!walletClient.account) {
+        throw new Error('No wallet account available');
+      }
+
+      const owner = options.owner ? validateAddress(options.owner) : walletClient.account.address;
+      displayInfo(`Creating project "${project}" with owner ${owner}...`);
+
+      const hash = await walletClient.writeContract({
+        address: factoryAddress,
+        abi: FACTORY_ABI,
+        functionName: 'createProject',
+        args: [project, owner],
+      });
+
+      const receipt = await waitForTransaction(hash);
+      displaySuccess(`Project "${project}" created`);
+      displayInfo(`Transaction: ${receipt.transactionHash}`);
+      displayInfo('Use "factory get <project>" to read deployed delegate addresses');
     } catch (error) {
-      displayError(`Failed to create delegate contract: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      displayError(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
 
 program
   .command('get')
-  .description('Get the delegate contract address for a project')
-  .argument('<domain>', 'Domain name for the project')
-  .action(async (domain: string) => {
+  .description('Get delegate contract addresses for a project')
+  .argument('<project>', 'Project name')
+  .option('-f, --factory <address>', 'Factory contract address')
+  .action(async (project: string, options: { factory?: string }) => {
     try {
-      const normalizedDomain = validateDomain(domain);
+      const factoryAddress = resolveFactoryAddress(options.factory);
       const publicClient = getPublicClient();
-      
-      displayInfo(`Looking up delegate contract for ${normalizedDomain}...`);
-      
-      // TODO: Implement factory contract lookup
-      // This would call the factory contract's getDelegate function
-      
-      displayInfo('Delegate contract address: [TO BE IMPLEMENTED]');
-      
+
+      const projectInfo = await publicClient.readContract({
+        address: factoryAddress,
+        abi: FACTORY_ABI,
+        functionName: 'getProject',
+        args: [project],
+      }) as {
+        basicDelegate: Address;
+        granularDelegate: Address;
+        owner: Address;
+        isActive: boolean;
+      };
+
+      displayInfo(`Project: ${project}`);
+      displayInfo(`  Basic delegate:    ${projectInfo.basicDelegate}`);
+      displayInfo(`  Granular delegate: ${projectInfo.granularDelegate}`);
+      displayInfo(`  Owner:             ${projectInfo.owner}`);
+      displayInfo(`  Active:            ${projectInfo.isActive}`);
     } catch (error) {
-      displayError(`Failed to get delegate contract: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      displayError(`Failed to get project: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });
 
 program
   .command('list')
-  .description('List all deployed delegate contracts')
-  .action(async () => {
+  .description('List all deployed projects')
+  .option('-f, --factory <address>', 'Factory contract address')
+  .action(async (options: { factory?: string }) => {
     try {
+      const factoryAddress = resolveFactoryAddress(options.factory);
       const publicClient = getPublicClient();
-      
-      displayInfo('Fetching all deployed delegate contracts...');
-      
-      // TODO: Implement factory contract enumeration
-      // This would call the factory contract's getAllDelegates function
-      
-      displayInfo('Deployed delegate contracts: [TO BE IMPLEMENTED]');
-      
+
+      const names = await publicClient.readContract({
+        address: factoryAddress,
+        abi: FACTORY_ABI,
+        functionName: 'getAllProjects',
+      }) as string[];
+
+      if (names.length === 0) {
+        displayInfo('No projects deployed');
+        return;
+      }
+
+      for (const name of names) {
+        const projectInfo = await publicClient.readContract({
+          address: factoryAddress,
+          abi: FACTORY_ABI,
+          functionName: 'getProject',
+          args: [name],
+        }) as {
+          basicDelegate: Address;
+          granularDelegate: Address;
+          owner: Address;
+          isActive: boolean;
+        };
+
+        displayInfo(`${name} (${projectInfo.isActive ? 'active' : 'inactive'})`);
+        displayInfo(`  basic=${projectInfo.basicDelegate}`);
+        displayInfo(`  granular=${projectInfo.granularDelegate}`);
+      }
     } catch (error) {
-      displayError(`Failed to list delegate contracts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      displayError(`Failed to list projects: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);
     }
   });

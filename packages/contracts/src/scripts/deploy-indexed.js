@@ -8,17 +8,23 @@ async function main() {
     console.log("Deploying contracts with account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
     
-    // Deploy IndexedENSManagerFactory
-    console.log("\n1. Deploying IndexedENSManagerFactory...");
+    // Deploy IndexedENSDeployer then factory
+    console.log("\n1. Deploying IndexedENSDeployer...");
+    const IndexedENSDeployer = await ethers.getContractFactory("IndexedENSDeployer");
+    const deployerContract = await IndexedENSDeployer.deploy();
+    await deployerContract.waitForDeployment();
+    console.log("IndexedENSDeployer deployed to:", await deployerContract.getAddress());
+
+    console.log("\n2. Deploying IndexedENSManagerFactory...");
     const IndexedENSManagerFactory = await ethers.getContractFactory("IndexedENSManagerFactory");
-    const factory = await IndexedENSManagerFactory.deploy();
+    const factory = await IndexedENSManagerFactory.deploy(await deployerContract.getAddress());
     await factory.waitForDeployment();
     console.log("IndexedENSManagerFactory deployed to:", await factory.getAddress());
     
     // Create a project
-    console.log("\n2. Creating project 'example-project'...");
+    console.log("\n3. Creating project 'example-project'...");
     const projectName = "example-project";
-    const tx = await factory.createProject(projectName);
+    const tx = await factory.createProject(projectName, deployer.address);
     const receipt = await tx.wait();
     console.log("Project created, gas used:", receipt.gasUsed.toString());
     
@@ -36,7 +42,7 @@ async function main() {
     
     // Initialize the example
     console.log("\n4. Initializing example project...");
-    const initTx = await example.initializeProject();
+    const initTx = await example.initializeProject(deployer.address);
     await initTx.wait();
     console.log("Project initialized");
     

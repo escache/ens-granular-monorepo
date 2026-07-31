@@ -26,6 +26,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recentDomains, setRecentDomains] = useState<string[]>([]);
   const [favoriteProjects, setFavoriteProjects] = useState<string[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [lastChainId, setLastChainId] = useState<number | undefined>(chainId);
+
+  useEffect(() => {
+    if (lastChainId !== undefined && chainId !== lastChainId) {
+      setSelectedDelegate('');
+      setSelectedGranularDelegate('');
+    }
+    setLastChainId(chainId);
+  }, [chainId, lastChainId]);
 
   useEffect(() => {
     const saved = localStorage.getItem('appContext');

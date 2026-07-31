@@ -274,34 +274,34 @@ export function ModernApp() {
                     <DelegationManagement delegateAddress={selectedDelegate} />
                   )}
                   {activeTab === 'granular' && (
-                    <GranularPermissions controllerAddress={selectedGranularDelegate} />
+                    <GranularPermissions delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'subdomain' && (
                     <SubdomainCreation delegateAddress={selectedDelegate} />
                   )}
                   {activeTab === 'approval' && <ApprovalManagement />}
                   {activeTab === 'batch' && (
-                    <BatchOperations controllerAddress={selectedGranularDelegate} />
+                    <BatchOperations delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'acl' && (
-                    <AccessControlLists controllerAddress={selectedGranularDelegate} />
+                    <AccessControlLists delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'emergency' && (
-                    <EmergencyControls controllerAddress={selectedGranularDelegate} />
+                    <EmergencyControls delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'delegates' && (
-                    <DelegateListView controllerAddress={selectedGranularDelegate} />
+                    <DelegateListView delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'resolver' && (
                     <ResolverManagement resolverAddress={resolverAddress} />
                   )}
                   {activeTab === 'security' && (
-                    <SecurityDashboard controllerAddress={selectedGranularDelegate} />
+                    <SecurityDashboard delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'addressbook' && <AddressBook />}
                   {activeTab === 'history' && <TransactionHistory />}
                   {activeTab === 'export' && (
-                    <ExportImport controllerAddress={selectedGranularDelegate} />
+                    <ExportImport delegateAddress={selectedGranularDelegate} />
                   )}
                   {activeTab === 'settings' && (
                     <Settings onResolverAddressChange={setResolverAddress} />

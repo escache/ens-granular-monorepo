@@ -367,9 +367,13 @@ contract ENSNamingDelegateGranular is Ownable, Pausable, ReentrancyGuard {
         uint64 ttl
     ) external onlyAuthorizedDelegate(parentNode, OP_CREATE_SUBDOMAIN) nonReentrant whenNotPaused {
         bytes32 subnode = keccak256(abi.encodePacked(parentNode, keccak256(bytes(label))));
-        
-        // Call ENS Registry to create the subdomain
-        ensRegistry.setSubnodeRecord(parentNode, label, owner, resolver, ttl);
+        require(_canModifyParent(parentNode), "ENSNamingDelegateGranular: not authorized on parent ENS name");
+
+        if (nameWrapper.isWrapped(parentNode)) {
+            nameWrapper.setSubnodeRecord(parentNode, label, owner, resolver, ttl, 0, type(uint64).max);
+        } else {
+            ensRegistry.setSubnodeRecord(parentNode, label, owner, resolver, ttl);
+        }
         
         emit SubdomainCreated(parentNode, label, subnode, owner);
     }
@@ -386,11 +390,22 @@ contract ENSNamingDelegateGranular is Ownable, Pausable, ReentrancyGuard {
         address newOwner
     ) external onlyAuthorizedDelegate(parentNode, OP_TRANSFER) nonReentrant whenNotPaused {
         bytes32 subnode = keccak256(abi.encodePacked(parentNode, keccak256(bytes(label))));
-        
-        // Call ENS Registry to transfer ownership
-        ensRegistry.setSubnodeOwner(parentNode, label, newOwner);
+        require(_canModifyParent(parentNode), "ENSNamingDelegateGranular: not authorized on parent ENS name");
+
+        if (nameWrapper.isWrapped(parentNode)) {
+            nameWrapper.setSubnodeOwner(parentNode, label, newOwner, 0, type(uint64).max);
+        } else {
+            ensRegistry.setSubnodeOwner(parentNode, label, newOwner);
+        }
         
         emit SubdomainTransferred(parentNode, label, subnode, newOwner);
+    }
+
+    function _canModifyParent(bytes32 parentNode) internal view returns (bool) {
+        if (nameWrapper.canModifyName(parentNode, address(this))) {
+            return true;
+        }
+        return ensRegistry.owner(parentNode) == address(this);
     }
 
     /**
