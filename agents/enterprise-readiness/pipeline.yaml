@@ -1,0 +1,73 @@
+version: 1
+agent:
+  clone:
+    depth: 1
+    ref:
+      type: branch
+      name: <+inputs.branch>
+    repo: <+inputs.repo>
+    connector: "<+inputs.gitConnector != null ? inputs.gitConnector.id : ''>"
+
+  inputs:
+    repo:
+      type: string
+      required: true
+    branch:
+      type: string
+      default: main
+    gitConnector:
+      type: connector
+
+  stages:
+    - name: enterprise-scorecard
+      id: enterprise
+      platform:
+        os: linux
+        arch: arm64
+      steps:
+        - name: run-gate
+          run:
+            shell: bash
+            script: |-
+              chmod +x scripts/assembly-gate.sh
+              scripts/assembly-gate.sh || true
+
+        - name: scorecard-agent
+          agent:
+            container:
+              image: pkg.harness.io/vrvdt5ius7uwygso8s0bia/harness-agents/claude-code-plugin:main
+            env:
+              ANTHROPIC_MODEL: arn:aws:bedrock:us-east-1:587817102444:application-inference-profile/7p8sn93lhspw
+              AWS_BEARER_TOKEN_BEDROCK: <+secrets.getValue("bedrock_api_key")>
+              AWS_REGION: us-east-1
+              CLAUDE_CODE_USE_BEDROCK: "1"
+            task: |
+              You are the Enterprise Readiness agent for ENS Granular decentralized enterprise software.
+
+              ## Inputs to read
+              - `agents/ASSEMBLY_STATUS.md`
+              - `.agent/output/gate-report.json`
+              - `.agent/output/*.md` workstream reports (if any)
+              - `ENSIP-DRAFT-UPDATED.md`, `OVERVIEW.md`
+
+              ## Produce `.agent/output/enterprise-scorecard.md`
+              Include:
+              1. Overall readiness score (1-5) with rationale
+              2. Scorecard table: Protocol, Contracts, UI, CLI, Docs, Security, Compliance, Operations
+              3. Blockers for regulated industry deployment
+              4. Audit readiness checklist (what's done vs missing)
+              5. Recommended next 3 orchestrator runs (which workstream agents to trigger)
+              6. Trust model summary for procurement/security reviewers
+
+              ## Update ASSEMBLY_STATUS.md
+              - Enterprise readiness score
+              - Enterprise Readiness workstream status
+
+              ## RULES
+              - Be honest — do not inflate scores
+              - Cite specific files/issues as evidence
+              - No code changes unless fixing scorecard doc typos
+            with:
+              allowed_tools: Read,Write,Glob
+              log_file: .agent/output/enterprise-log.jsonl
+            max_turns: 100

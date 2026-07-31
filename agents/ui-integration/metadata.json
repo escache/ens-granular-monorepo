@@ -1,0 +1,5 @@
+{
+  "name": "UI Integration",
+  "description": "Wires EnterpriseApp delegate context, contract config, error handling, and accessibility for production admin UI",
+  "version": "1.0.0"
+}

@@ -1,0 +1,91 @@
+version: 1
+agent:
+  clone:
+    depth: 1
+    ref:
+      type: branch
+      name: <+inputs.branch>
+    repo: <+inputs.repo>
+    connector: "<+inputs.gitConnector != null ? inputs.gitConnector.id : ''>"
+
+  inputs:
+    repo:
+      type: string
+      required: true
+      description: Repository identifier (org/repo)
+    branch:
+      type: string
+      default: main
+      description: Branch to assemble
+    gitConnector:
+      type: connector
+      description: Git connector for clone and push
+    createPr:
+      type: string
+      default: "true"
+      description: Open a PR when fixes are made (true/false)
+
+  stages:
+    - name: assess-and-plan
+      id: assess
+      platform:
+        os: linux
+        arch: arm64
+      steps:
+        - name: run-assembly-gate
+          run:
+            shell: bash
+            script: |-
+              chmod +x scripts/assembly-gate.sh
+              scripts/assembly-gate.sh || true
+
+        - name: orchestrate-assembly
+          agent:
+            container:
+              image: pkg.harness.io/vrvdt5ius7uwygso8s0bia/harness-agents/claude-code-plugin:main
+            env:
+              ANTHROPIC_MODEL: arn:aws:bedrock:us-east-1:587817102444:application-inference-profile/7p8sn93lhspw
+              AWS_BEARER_TOKEN_BEDROCK: <+secrets.getValue("bedrock_api_key")>
+              AWS_REGION: us-east-1
+              CLAUDE_CODE_USE_BEDROCK: "1"
+            task: |
+              You are the Assembly Orchestrator for the ENS Granular monorepo — decentralized enterprise ENS software.
+
+              ## Phase 1 — Assess
+              1. Read `agents/assembly-manifest.json` and `agents/ASSEMBLY_STATUS.md`
+              2. Read `.agent/output/gate-report.json` from the prior step
+              3. Identify which workstreams are blocked or failing
+
+              ## Phase 2 — Plan
+              4. Write a prioritized plan to `.agent/output/assembly-plan.md` with:
+                 - Top 5 actionable items for this run
+                 - Which specialized agent should own each item
+                 - Dependencies between items
+                 - Definition of done per item
+
+              ## Phase 3 — Execute highest-priority fix
+              5. Pick the single highest-impact item you can complete in this run
+              6. Implement the fix with minimal, focused diffs
+              7. Run `scripts/assembly-gate.sh` and fix regressions
+              8. Update `agents/ASSEMBLY_STATUS.md` workstream table and checkboxes
+
+              ## Phase 4 — Ship
+              9. If changes were made and createPr is true:
+                 - Commit to branch `cursor/assembly-<date>-<topic>`
+                 - Push and open a draft PR against main with a clear summary
+
+              ## RULES
+              - Follow existing code conventions; minimal scope per PR
+              - Never fake CLI success on unimplemented commands
+              - Do not claim enterprise-ready until integration gate passes
+              - Reference the enterprise review critical path in ASSEMBLY_STATUS.md
+              - Prefer fixing integration-gate failures before new features
+            mcp_servers:
+              github:
+                url: https://api.githubcopilot.com/mcp/
+                headers:
+                  Authorization: Bearer <+secrets.getValue("github_pat")>
+            with:
+              allowed_tools: Read,Edit,Write,Bash,Glob,Grep,mcp__github__*
+              log_file: .agent/output/orchestrator-log.jsonl
+            max_turns: 200

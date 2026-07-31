@@ -1,0 +1,5 @@
+{
+  "name": "Docs Reconciliation",
+  "description": "Aligns documentation with implemented code, fixes Docusaurus build, and removes phantom feature references",
+  "version": "1.0.0"
+}
