@@ -61,7 +61,7 @@ export async function checkApproval(parentOwner: Address, delegateContract: Addr
   
   try {
     const isApproved = await publicClient.readContract({
-      address: '0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401' as Address, // NAME_WRAPPER
+      address: (process.env.NAME_WRAPPER || '0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401') as Address,
       abi: [
         {
           name: 'isApprovedForAll',

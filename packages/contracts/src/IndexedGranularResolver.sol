@@ -120,14 +120,22 @@ contract IndexedGranularResolver is IENSResolver, Ownable, Pausable, ReentrancyG
             return true;
         }
 
-        // Get domain index from manager
-        uint8 domainIndex = managerInterface.namehashToDomainIndex(node);
+        // Get domain scope from manager (top-level or subdomain)
+        (uint8 domainIndex, uint16 subdomainIndex) = managerInterface.resolveNodeScope(node);
         if (domainIndex == 0) {
-            return false; // Domain not managed by this system
+            return false;
         }
 
-        // Check GNA delegation using indexed manager
-        return managerInterface.isAuthorizedDelegate(domainIndex, caller, requiredPermission);
+        if (subdomainIndex == 0) {
+            return managerInterface.isAuthorizedDelegate(domainIndex, caller, requiredPermission);
+        }
+
+        return managerInterface.isAuthorizedDelegateForSubdomain(
+            domainIndex,
+            subdomainIndex,
+            caller,
+            requiredPermission
+        );
     }
 
     // ============ RESOLVER SETTER FUNCTIONS ============

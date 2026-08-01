@@ -77,6 +77,8 @@ interface IIndexedENSManager {
 
     // Permission checking
     function isAuthorizedDelegate(uint8 domainIndex, address delegate, uint128 requiredPermission) external view returns (bool);
+    function isAuthorizedDelegateForSubdomain(uint8 domainIndex, uint16 subdomainIndex, address delegate, uint128 requiredPermission) external view returns (bool);
+    function resolveNodeScope(bytes32 node) external view returns (uint8 domainIndex, uint16 subdomainIndex);
     function hasPermission(uint8 domainIndex, address delegate, uint128 requiredPermission) external view returns (bool);
     function getPermissions(uint8 domainIndex, address delegate) external view returns (uint128);
 

@@ -21,6 +21,7 @@ const sidebars = {
       label: 'Architecture',
       items: [
         'architecture/overview',
+        'implementation-status',
       ],
     },
   ],

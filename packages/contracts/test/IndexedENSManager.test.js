@@ -1,9 +1,8 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-// Skipped: IndexedENSManagerFactory exceeds contract size limit (24KB)
-// TODO: Optimize contract size or split into multiple contracts
-describe.skip("IndexedENSManager", function () {
+// Indexed stack tests (factory uses external deployer to stay under 24KB limit)
+describe("IndexedENSManager", function () {
   let factory, manager, resolver, example;
   let owner, delegate1, delegate2, delegate3;
   let projectName = "test-project";
@@ -21,30 +20,46 @@ describe.skip("IndexedENSManager", function () {
   const SET_OWNER = 1 << 9;
   const SET_FUSES = 1 << 10;
 
+  async function registerTopLevelDomain(mgr, domainName) {
+    const node = ethers.namehash(domainName);
+    await mgr.registerTopLevelDomain(node);
+    return await mgr.namehashToDomainIndex(node);
+  }
+
+  async function registerSubdomainLabel(mgr, parentIndex, label) {
+    await mgr.registerSubdomain(parentIndex, label);
+    return await mgr.getSubdomainIndex(parentIndex, label);
+  }
+
+  async function futureExpiry(offsetSeconds = 365 * 24 * 60 * 60) {
+    const block = await ethers.provider.getBlock('latest');
+    return block.timestamp + offsetSeconds;
+  }
+
   beforeEach(async function () {
     [owner, delegate1, delegate2, delegate3] = await ethers.getSigners();
 
     // Deploy factory
+    const IndexedENSDeployer = await ethers.getContractFactory("IndexedENSDeployer");
+    const deployerContract = await IndexedENSDeployer.deploy();
+    await deployerContract.waitForDeployment();
+
     const IndexedENSManagerFactory = await ethers.getContractFactory("IndexedENSManagerFactory");
-    factory = await IndexedENSManagerFactory.deploy();
+    factory = await IndexedENSManagerFactory.deploy(await deployerContract.getAddress());
     await factory.waitForDeployment();
 
-    // Create project
-    const tx = await factory.createProject(projectName);
+    const tx = await factory.createProject(projectName, owner.address);
     await tx.wait();
     
     const project = await factory.getProject(projectName);
-    manager = await ethers.getContractAt("IndexedENSManager", project.manager);
-    resolver = await ethers.getContractAt("IndexedGranularResolver", project.resolver);
+    manager = await ethers.getContractAt("IndexedENSManager", project.manager, owner);
+    resolver = await ethers.getContractAt("IndexedGranularResolver", project.resolver, owner);
   });
 
   describe("Domain Registration", function () {
     it("Should register top-level domains", async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whoNamehash = ethers.namehash("who.eth");
-
-      const whatIndex = await manager.registerTopLevelDomain(whatNamehash);
-      const whoIndex = await manager.registerTopLevelDomain(whoNamehash);
+      const whatIndex = await registerTopLevelDomain(manager, "what.eth");
+      const whoIndex = await registerTopLevelDomain(manager, "who.eth");
 
       expect(whatIndex).to.equal(1);
       expect(whoIndex).to.equal(2);
@@ -52,18 +67,17 @@ describe.skip("IndexedENSManager", function () {
       const whatDomain = await manager.topLevelDomains(whatIndex);
       const whoDomain = await manager.topLevelDomains(whoIndex);
 
-      expect(whatDomain.namehash).to.equal(whatNamehash);
-      expect(whoDomain.namehash).to.equal(whoNamehash);
+      expect(whatDomain.namehash).to.equal(ethers.namehash("what.eth"));
+      expect(whoDomain.namehash).to.equal(ethers.namehash("who.eth"));
       expect(whatDomain.isActive).to.be.true;
       expect(whoDomain.isActive).to.be.true;
     });
 
     it("Should register subdomains", async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whatIndex = await manager.registerTopLevelDomain(whatNamehash);
+      const whatIndex = await registerTopLevelDomain(manager, "what.eth");
 
-      const abcIndex = await manager.registerSubdomain(whatIndex, "abc");
-      const defIndex = await manager.registerSubdomain(whatIndex, "def");
+      const abcIndex = await registerSubdomainLabel(manager, whatIndex, "abc");
+      const defIndex = await registerSubdomainLabel(manager, whatIndex, "def");
 
       expect(abcIndex).to.equal(1);
       expect(defIndex).to.equal(2);
@@ -78,11 +92,10 @@ describe.skip("IndexedENSManager", function () {
     });
 
     it("Should find subdomain by label", async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whatIndex = await manager.registerTopLevelDomain(whatNamehash);
+      const whatIndex = await registerTopLevelDomain(manager, "what.eth");
 
-      await manager.registerSubdomain(whatIndex, "abc");
-      await manager.registerSubdomain(whatIndex, "def");
+      await registerSubdomainLabel(manager, whatIndex, "abc");
+      await registerSubdomainLabel(manager, whatIndex, "def");
 
       const abcFoundIndex = await manager.getSubdomainIndex(whatIndex, "abc");
       const defFoundIndex = await manager.getSubdomainIndex(whatIndex, "def");
@@ -98,15 +111,12 @@ describe.skip("IndexedENSManager", function () {
     let whatIndex, whoIndex;
 
     beforeEach(async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whoNamehash = ethers.namehash("who.eth");
-
-      whatIndex = await manager.registerTopLevelDomain(whatNamehash);
-      whoIndex = await manager.registerTopLevelDomain(whoNamehash);
+      whatIndex = await registerTopLevelDomain(manager, "what.eth");
+      whoIndex = await registerTopLevelDomain(manager, "who.eth");
     });
 
     it("Should add delegates for top-level domains", async function () {
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60; // 1 year
+      const expiresAt = await futureExpiry();
 
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
       await manager.addDelegate(whoIndex, delegate2.address, MANAGE_SUBDOMAINS | SET_TEXT_RECORD, expiresAt);
@@ -119,20 +129,56 @@ describe.skip("IndexedENSManager", function () {
     });
 
     it("Should add delegates for specific subdomains", async function () {
-      const abcIndex = await manager.registerSubdomain(whatIndex, "abc");
-      const expiresAt = Math.floor(Date.now() / 1000) + 180 * 24 * 60 * 60; // 6 months
+      const abcIndex = await registerSubdomainLabel(manager, whatIndex, "abc");
+      const expiresAt = await futureExpiry(180 * 24 * 60 * 60);
 
       await manager.addSubdomainDelegate(whatIndex, abcIndex, delegate1.address, SET_TEXT_RECORD | SET_CONTENT_HASH, expiresAt);
 
-      const hasTextPermission = await manager.hasPermission(whatIndex, delegate1.address, SET_TEXT_RECORD);
-      const hasContentPermission = await manager.hasPermission(whatIndex, delegate1.address, SET_CONTENT_HASH);
+      const hasTextPermission = await manager.isAuthorizedDelegateForSubdomain(
+        whatIndex,
+        abcIndex,
+        delegate1.address,
+        SET_TEXT_RECORD
+      );
+      const hasContentPermission = await manager.isAuthorizedDelegateForSubdomain(
+        whatIndex,
+        abcIndex,
+        delegate1.address,
+        SET_CONTENT_HASH
+      );
 
       expect(hasTextPermission).to.be.true;
       expect(hasContentPermission).to.be.true;
     });
 
+    it("Should scope subdomain delegates to their subdomain", async function () {
+      const abcIndex = await registerSubdomainLabel(manager, whatIndex, "abc");
+      const defIndex = await registerSubdomainLabel(manager, whatIndex, "def");
+      const expiresAt = await futureExpiry(180 * 24 * 60 * 60);
+
+      await manager.addSubdomainDelegate(whatIndex, abcIndex, delegate1.address, SET_TEXT_RECORD, expiresAt);
+
+      const allowedOnAbc = await manager.isAuthorizedDelegateForSubdomain(
+        whatIndex,
+        abcIndex,
+        delegate1.address,
+        SET_TEXT_RECORD
+      );
+      const deniedOnDef = await manager.isAuthorizedDelegateForSubdomain(
+        whatIndex,
+        defIndex,
+        delegate1.address,
+        SET_TEXT_RECORD
+      );
+      const deniedOnTld = await manager.hasPermission(whatIndex, delegate1.address, SET_TEXT_RECORD);
+
+      expect(allowedOnAbc).to.be.true;
+      expect(deniedOnDef).to.be.false;
+      expect(deniedOnTld).to.be.false;
+    });
+
     it("Should update delegate permissions", async function () {
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
 
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
       
@@ -147,7 +193,7 @@ describe.skip("IndexedENSManager", function () {
     });
 
     it("Should lock and unlock delegates", async function () {
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
 
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
 
@@ -168,7 +214,7 @@ describe.skip("IndexedENSManager", function () {
     });
 
     it("Should enable and disable delegates", async function () {
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
 
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
 
@@ -190,14 +236,11 @@ describe.skip("IndexedENSManager", function () {
     let whatIndex, whoIndex;
 
     beforeEach(async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whoNamehash = ethers.namehash("who.eth");
-
-      whatIndex = await manager.registerTopLevelDomain(whatNamehash);
-      whoIndex = await manager.registerTopLevelDomain(whoNamehash);
+      whatIndex = await registerTopLevelDomain(manager, "what.eth");
+      whoIndex = await registerTopLevelDomain(manager, "who.eth");
 
       // Add some delegates
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
       await manager.addDelegate(whatIndex, delegate2.address, SET_TEXT_RECORD, expiresAt);
       await manager.addDelegate(whoIndex, delegate3.address, MANAGE_SUBDOMAINS, expiresAt);
@@ -239,10 +282,9 @@ describe.skip("IndexedENSManager", function () {
     let whatIndex;
 
     beforeEach(async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      whatIndex = await manager.registerTopLevelDomain(whatNamehash);
+      whatIndex = await registerTopLevelDomain(manager, "what.eth");
 
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
       await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
     });
 
@@ -279,10 +321,9 @@ describe.skip("IndexedENSManager", function () {
 
   describe("Gas Optimization", function () {
     it("Should have reasonable gas costs for common operations", async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      const whatIndex = await manager.registerTopLevelDomain(whatNamehash);
+      const whatIndex = await registerTopLevelDomain(manager, "what.eth");
 
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
 
       // Measure gas for adding delegate
       const addDelegateTx = await manager.addDelegate(whatIndex, delegate1.address, SET_ADDR_RECORD, expiresAt);
@@ -306,10 +347,9 @@ describe.skip("IndexedENSManager", function () {
     let whatIndex;
 
     beforeEach(async function () {
-      const whatNamehash = ethers.namehash("what.eth");
-      whatIndex = await manager.registerTopLevelDomain(whatNamehash);
+      whatIndex = await registerTopLevelDomain(manager, "what.eth");
 
-      const expiresAt = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+      const expiresAt = await futureExpiry();
       await manager.addDelegate(whatIndex, delegate1.address, SET_TEXT_RECORD, expiresAt);
     });
 

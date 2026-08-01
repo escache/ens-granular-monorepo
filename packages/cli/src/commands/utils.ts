@@ -1,6 +1,9 @@
 import { Command } from 'commander';
-import { displayInfo, displayError, validateDomain } from '../utils/helpers';
+import { displayInfo, displayError, validateDomain, validateAddress, checkApproval } from '../utils/helpers';
 import { namehash, normalize } from 'viem/ens';
+import { getPublicClient, config } from '../config';
+import { domainToNode } from '../utils/contracts';
+import { ENS_REGISTRY_ABI } from '../abis';
 
 const program = new Command();
 
@@ -106,21 +109,30 @@ program
 
 program
   .command('check-approval')
-  .description('Check if a delegate contract is approved for a domain')
-  .argument('<domain>', 'Domain name to check')
+  .description('Check if a delegate contract is approved for a domain owner')
+  .argument('<domain>', 'Domain name to resolve owner from ENS')
   .argument('<delegate>', 'Delegate contract address')
   .action(async (domain: string, delegate: string) => {
     try {
       const normalizedDomain = validateDomain(domain);
-      
-      displayInfo(`Checking approval for ${normalizedDomain}...`);
-      displayInfo(`Delegate: ${delegate}`);
-      
-      // TODO: Implement approval checking
-      // This would check if the delegate contract is approved via setApprovalForAll
-      
-      displayInfo('Approval status: [TO BE IMPLEMENTED]');
-      
+      const delegateAddress = validateAddress(delegate);
+      const publicClient = getPublicClient();
+      const node = domainToNode(normalizedDomain);
+
+      const owner = await publicClient.readContract({
+        address: config.ensRegistry,
+        abi: ENS_REGISTRY_ABI,
+        functionName: 'owner',
+        args: [node],
+      }) as string;
+
+      const isApproved = await checkApproval(owner as `0x${string}`, delegateAddress);
+      displayInfo(`Domain owner: ${owner}`);
+      displayInfo(`Delegate: ${delegateAddress}`);
+      displayInfo(`Approval status: ${isApproved ? 'approved' : 'not approved'}`);
+      if (!isApproved) {
+        displayInfo('Run: ens-granular approve set-approval <delegate>');
+      }
     } catch (error) {
       displayError(`Failed to check approval: ${error instanceof Error ? error.message : 'Unknown error'}`);
       process.exit(1);

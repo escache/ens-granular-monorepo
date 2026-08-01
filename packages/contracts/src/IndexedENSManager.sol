@@ -94,6 +94,19 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
     
     // Subdomain label hash to index mapping for efficient lookups
     mapping(uint8 => mapping(bytes32 => uint16)) public labelHashToSubdomainIndex;
+
+    // Subdomain namehash to parent domain + index (for resolver authorization)
+    struct SubdomainRef {
+        uint8 domainIndex;
+        uint16 subdomainIndex;
+    }
+    mapping(bytes32 => SubdomainRef) public subdomainNamehashToRef;
+
+    // Scoped delegate lookup for subdomain-specific delegates (avoids TLD index collision)
+    mapping(bytes32 => uint16) public scopedDelegateIndex;
+
+    // Emergency pause state (separate from domain registration isActive flag)
+    mapping(uint8 => bool) public domainEmergencyPaused;
     
     // ============ EVENTS ============
     
@@ -133,7 +146,7 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
     }
     
     modifier onlyNotEmergencyPaused(uint8 domainIndex) {
-        require(!topLevelDomains[domainIndex].isActive || !isEmergencyPaused(domainIndex), "Domain emergency paused");
+        require(!domainEmergencyPaused[domainIndex], "Domain emergency paused");
         _;
     }
     
@@ -197,6 +210,13 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
         });
         
         labelHashToSubdomainIndex[parentDomainIndex][labelHash] = subdomainIndex;
+
+        bytes32 parentNamehash = topLevelDomains[parentDomainIndex].namehash;
+        bytes32 subnode = keccak256(abi.encodePacked(parentNamehash, labelHash));
+        subdomainNamehashToRef[subnode] = SubdomainRef({
+            domainIndex: parentDomainIndex,
+            subdomainIndex: subdomainIndex
+        });
         
         // Update parent domain subdomain count
         topLevelDomains[parentDomainIndex].subdomainCount = subdomainIndex;
@@ -272,7 +292,7 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
         delegateCounts[domainIndex] = delegateIndex;
         
         delegates[domainIndex][delegateIndex] = delegate;
-        addressToDelegateIndex[delegate][domainIndex] = delegateIndex;
+        scopedDelegateIndex[_delegateScopeKey(delegate, domainIndex, subdomainIndex)] = delegateIndex;
         
         permissions[domainIndex][delegateIndex] = PackedDelegatePermission({
             permissions: permissionMask,
@@ -303,7 +323,11 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
         // Clear mappings
         delete delegates[domainIndex][delegateIndex];
         delete permissions[domainIndex][delegateIndex];
-        addressToDelegateIndex[delegate][domainIndex] = 0;
+        if (perm.subdomainIndex > 0) {
+            scopedDelegateIndex[_delegateScopeKey(delegate, domainIndex, perm.subdomainIndex)] = 0;
+        } else {
+            addressToDelegateIndex[delegate][domainIndex] = 0;
+        }
         
         emit DelegateRemoved(domainIndex, delegateIndex, delegate);
     }
@@ -416,19 +440,78 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
         address delegate,
         uint128 requiredPermission
     ) public view returns (bool) {
+        if (domainIndex == 0 || domainIndex > topLevelDomainCount) return false;
+        if (!topLevelDomains[domainIndex].isActive) return false;
+        if (domainEmergencyPaused[domainIndex]) return false;
+
         uint16 delegateIndex = addressToDelegateIndex[delegate][domainIndex];
-        if (delegateIndex == 0) return false;
-        
-        PackedDelegatePermission memory perm = permissions[domainIndex][delegateIndex];
-        
-        // Check if enabled
+        return _isAuthorizedAtScope(domainIndex, 0, delegateIndex, requiredPermission);
+    }
+
+    /**
+     * @dev Check authorization for a specific subdomain scope
+     */
+    function isAuthorizedDelegateForSubdomain(
+        uint8 domainIndex,
+        uint16 subdomainIndex,
+        address delegate,
+        uint128 requiredPermission
+    ) public view returns (bool) {
+        if (domainIndex == 0 || domainIndex > topLevelDomainCount) return false;
+        if (!topLevelDomains[domainIndex].isActive) return false;
+        if (domainEmergencyPaused[domainIndex]) return false;
+        if (subdomainIndex == 0 || subdomainIndex > subdomainCounts[domainIndex]) return false;
+        if (!subdomains[domainIndex][subdomainIndex].isActive) return false;
+
+        uint16 tldDelegateIndex = addressToDelegateIndex[delegate][domainIndex];
+        if (_isAuthorizedAtScope(domainIndex, subdomainIndex, tldDelegateIndex, requiredPermission)) {
+            return true;
+        }
+
+        uint16 scopedIndex = scopedDelegateIndex[_delegateScopeKey(delegate, domainIndex, subdomainIndex)];
+        return _isAuthorizedAtScope(domainIndex, subdomainIndex, scopedIndex, requiredPermission);
+    }
+
+    /**
+     * @dev Resolve a namehash to domain/subdomain scope for authorization
+     */
+    function resolveNodeScope(bytes32 node) external view returns (uint8 domainIndex, uint16 subdomainIndex) {
+        domainIndex = namehashToDomainIndex[node];
+        if (domainIndex != 0) {
+            return (domainIndex, 0);
+        }
+
+        SubdomainRef memory ref = subdomainNamehashToRef[node];
+        return (ref.domainIndex, ref.subdomainIndex);
+    }
+
+    function _delegateScopeKey(address delegate, uint8 domainIndex, uint16 subdomainIndex) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(delegate, domainIndex, subdomainIndex));
+    }
+
+    function _permissionValid(PackedDelegatePermission memory perm) internal view returns (bool) {
         if ((perm.flags & 0x01) == 0) return false;
-        
-        // Check expiration
         if (perm.expiresAt > 0 && block.timestamp > perm.expiresAt) return false;
-        
-        // Check permission
-        return (perm.permissions & requiredPermission) == requiredPermission;
+        return true;
+    }
+
+    function _isAuthorizedAtScope(
+        uint8 domainIndex,
+        uint16 scopeSubdomainIndex,
+        uint16 delegateIndex,
+        uint128 requiredPermission
+    ) internal view returns (bool) {
+        if (delegateIndex == 0 || delegateIndex > delegateCounts[domainIndex]) return false;
+
+        PackedDelegatePermission memory perm = permissions[domainIndex][delegateIndex];
+        if (!_permissionValid(perm)) return false;
+        if ((perm.permissions & requiredPermission) != requiredPermission) return false;
+
+        if (scopeSubdomainIndex == 0) {
+            return perm.subdomainIndex == 0;
+        }
+
+        return perm.subdomainIndex == 0 || perm.subdomainIndex == scopeSubdomainIndex;
     }
     
     /**
@@ -540,15 +623,9 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
      * @param domainIndex The domain index
      * @param paused Whether to pause (true) or unpause (false)
      */
-    function emergencyPause(uint8 domainIndex, bool paused) external onlyOwner onlyValidDomain(domainIndex) {
-        // This would require additional storage for emergency pause state
-        // For now, we can use the existing isActive flag
-        if (paused) {
-            topLevelDomains[domainIndex].isActive = false;
-        } else {
-            topLevelDomains[domainIndex].isActive = true;
-        }
-        
+    function emergencyPause(uint8 domainIndex, bool paused) external onlyOwner {
+        require(domainIndex > 0 && domainIndex <= topLevelDomainCount, "Invalid domain index");
+        domainEmergencyPaused[domainIndex] = paused;
         emit EmergencyPause(domainIndex, paused);
     }
     
@@ -558,7 +635,7 @@ contract IndexedENSManager is Ownable, Pausable, ReentrancyGuard {
      * @return isPaused True if emergency paused
      */
     function isEmergencyPaused(uint8 domainIndex) public view returns (bool) {
-        return !topLevelDomains[domainIndex].isActive;
+        return domainEmergencyPaused[domainIndex];
     }
     
     // ============ UTILITY FUNCTIONS ============

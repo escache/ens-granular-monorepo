@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useChainId, useSwitchChain } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '../config/contracts';
+import { useAppContext } from '../contexts/AppContext';
 
 interface SettingsProps {
   onResolverAddressChange?: (address: string) => void;
@@ -9,22 +10,13 @@ interface SettingsProps {
 export function Settings({ onResolverAddressChange }: SettingsProps) {
   const chainId = useChainId();
   const { chains, switchChain } = useSwitchChain();
-  const [resolverAddress, setResolverAddress] = useState('');
+  const { resolverAddress, setResolverAddress } = useAppContext();
   const [factoryAddress, setFactoryAddress] = useState('');
 
   const currentConfig = CONTRACT_ADDRESSES[chainId];
 
-  useEffect(() => {
-    const saved = localStorage.getItem('resolverAddress');
-    if (saved) {
-      setResolverAddress(saved);
-      onResolverAddressChange?.(saved);
-    }
-  }, [onResolverAddressChange]);
-
   const handleResolverAddressChange = (address: string) => {
     setResolverAddress(address);
-    localStorage.setItem('resolverAddress', address);
     onResolverAddressChange?.(address);
   };
 

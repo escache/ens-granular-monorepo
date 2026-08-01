@@ -57,9 +57,9 @@ contract IndexedENSExample {
      * @dev Initialize the example project
      * @return success True if initialization successful
      */
-    function initializeProject() external returns (bool success) {
-        // Create project through factory
-        (address managerAddr, address resolverAddr) = factory.createProject(PROJECT_NAME);
+    function initializeProject(address projectOwner) external returns (bool success) {
+        require(projectOwner != address(0), "Owner required");
+        (address managerAddr, address resolverAddr) = factory.createProject(PROJECT_NAME, projectOwner);
         
         manager = IndexedENSManager(managerAddr);
         resolver = IndexedGranularResolver(resolverAddr);

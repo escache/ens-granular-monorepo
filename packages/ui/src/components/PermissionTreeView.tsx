@@ -103,7 +103,7 @@ function TreeNode({ node, depth, expanded, onToggle, activePermissions }: TreeNo
 
 export function PermissionTreeView() {
   const { address, isConnected } = useAccount();
-  const { resolverAddress } = useAppContext();
+  const { selectedGranularDelegate } = useAppContext();
   const [domain, setDomain] = useState('');
   const [delegateToCheck, setDelegateToCheck] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['records', 'management', 'security']));
@@ -121,12 +121,12 @@ export function PermissionTreeView() {
 
   // Read delegate info from contract
   const { data: info, isLoading, isError } = useReadContract({
-    address: resolverAddress as `0x${string}`,
+    address: selectedGranularDelegate as `0x${string}`,
     abi: granularABI,
     functionName: 'getDelegateInfo',
     args: node && delegateToCheck ? [node, delegateToCheck as `0x${string}`] : undefined,
     query: {
-      enabled: !!resolverAddress && !!node && !!delegateToCheck && delegateToCheck.startsWith('0x'),
+      enabled: !!selectedGranularDelegate && !!node && !!delegateToCheck && delegateToCheck.startsWith('0x'),
     },
   });
 
