@@ -1,0 +1,5 @@
+{
+  "name": "Assembly Orchestrator",
+  "description": "Coordinates ENS Granular workstreams, runs the integration gate, prioritizes fixes, and updates assembly status for continuous enterprise rollout",
+  "version": "1.0.0"
+}

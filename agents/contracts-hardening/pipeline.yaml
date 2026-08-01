@@ -1,0 +1,78 @@
+version: 1
+agent:
+  clone:
+    depth: 1
+    ref:
+      type: branch
+      name: <+inputs.branch>
+    repo: <+inputs.repo>
+    connector: "<+inputs.gitConnector != null ? inputs.gitConnector.id : ''>"
+
+  inputs:
+    repo:
+      type: string
+      required: true
+    branch:
+      type: string
+      default: main
+    gitConnector:
+      type: connector
+    forkMainnet:
+      type: string
+      default: "false"
+      description: Run fork tests when RPC_URL is configured (true/false)
+
+  stages:
+    - name: harden-contracts
+      id: contracts
+      platform:
+        os: linux
+        arch: arm64
+      steps:
+        - name: contracts-agent
+          agent:
+            container:
+              image: pkg.harness.io/vrvdt5ius7uwygso8s0bia/harness-agents/claude-code-plugin:main
+            env:
+              ANTHROPIC_MODEL: arn:aws:bedrock:us-east-1:587817102444:application-inference-profile/7p8sn93lhspw
+              AWS_BEARER_TOKEN_BEDROCK: <+secrets.getValue("bedrock_api_key")>
+              AWS_REGION: us-east-1
+              CLAUDE_CODE_USE_BEDROCK: "1"
+              RPC_URL: <+secrets.getValue("ethereum_rpc_url")>
+            task: |
+              You are the Contracts Hardening agent for ENS Granular (packages/contracts).
+
+              Read `agents/assembly-manifest.json` criticalIssues for contracts-hardening.
+
+              ## Priority order (fix one per run unless trivially related)
+              1. Subdomain ops — ENS requires parent owner as msg.sender; implement NameWrapper operator pattern or document/remove broken paths
+              2. IndexedENSManagerFactory — exceeds 24KB limit OR remove from production path until fixed
+              3. Factory ownership transfer to project owners (match ENSNamingDelegateFactory pattern)
+              4. Indexed subdomain permission scoping in isAuthorizedDelegate
+              5. Production GranularResolver integration tests (not just TestableGranularResolver)
+              6. emergencyRevokeAll — actually revoke or rename to emergencyPauseAll
+              7. Ownable2Step on admin contracts
+
+              ## Workflow
+              1. Run `npm run test:contracts --workspace=@ens-granular/contracts`
+              2. Implement highest-priority fix with minimal diff
+              3. Add/adjust Hardhat tests; un-skip IndexedENSManager tests when fixed
+              4. Run `scripts/assembly-gate.sh`
+              5. Write `.agent/output/contracts-report.md` with changes, risks, audit notes
+              6. Update `agents/ASSEMBLY_STATUS.md` contracts row
+              7. Commit, push, open draft PR if fixes made
+
+              ## RULES
+              - OpenZeppelin patterns; no breaking changes without migration notes
+              - Never deploy to mainnet from this agent
+              - Document trust model changes in report
+              - If forkMainnet=true and RPC_URL set, run `npm run test:contracts:fork`
+            mcp_servers:
+              github:
+                url: https://api.githubcopilot.com/mcp/
+                headers:
+                  Authorization: Bearer <+secrets.getValue("github_pat")>
+            with:
+              allowed_tools: Read,Edit,Write,Bash,Glob,Grep,mcp__github__*
+              log_file: .agent/output/contracts-log.jsonl
+            max_turns: 200

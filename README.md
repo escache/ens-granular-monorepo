@@ -52,12 +52,22 @@ npm run build
 ### Basic Usage
 
 ```bash
-# Start development server
+# Start documentation dev server
 npm run dev
+
+# Start the web UI
+npm run dev:ui
+
+# Run assembly gate (build + test + lint)
+npm run assembly:gate
 
 # Run CLI commands
 npm run cli -- delegate set example.eth --primary 0x123...
 ```
+
+### Continuous Assembly (Harness AI Agents)
+
+Autonomous agents continuously assemble this monorepo toward enterprise deployment. See [agents/README.md](agents/README.md) for setup, scheduling, and workstream definitions.
 
 ## Features
 

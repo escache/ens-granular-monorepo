@@ -1,0 +1,5 @@
+{
+  "name": "CLI Implementation",
+  "description": "Replaces CLI TODO stubs with real viem contract calls and secure configuration for enterprise automation",
+  "version": "1.0.0"
+}

@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "project": "ens-granular-monorepo",
+  "description": "Workstreams and dependencies for continuous assembly of decentralized enterprise ENS software",
+  "workstreams": [
+    {
+      "id": "integration-gate",
+      "name": "Integration Gate",
+      "path": "agents/integration-gate",
+      "dependsOn": [],
+      "validates": ["npm run build", "npm run test:contracts", "npm run test:ui", "npm run lint"],
+      "outputs": [".agent/output/gate-report.json"]
+    },
+    {
+      "id": "contracts-hardening",
+      "name": "Contracts Hardening",
+      "path": "agents/contracts-hardening",
+      "dependsOn": ["integration-gate"],
+      "scope": ["packages/contracts"],
+      "criticalIssues": [
+        "subdomain ENS ownership integration",
+        "IndexedENSManagerFactory deployability",
+        "factory ownership transfer",
+        "indexed subdomain permission scoping",
+        "production GranularResolver integration tests"
+      ],
+      "outputs": [".agent/output/contracts-report.md"]
+    },
+    {
+      "id": "ui-integration",
+      "name": "UI Integration",
+      "path": "agents/ui-integration",
+      "dependsOn": ["integration-gate", "contracts-hardening"],
+      "scope": ["packages/ui"],
+      "criticalIssues": [
+        "EnterpriseApp delegate context wiring",
+        "mainnet/sepolia contract addresses",
+        "error boundaries and user-facing errors",
+        "accessibility on active components"
+      ],
+      "outputs": [".agent/output/ui-report.md"]
+    },
+    {
+      "id": "cli-implementation",
+      "name": "CLI Implementation",
+      "path": "agents/cli-implementation",
+      "dependsOn": ["integration-gate", "contracts-hardening"],
+      "scope": ["packages/cli"],
+      "criticalIssues": [
+        "replace TODO stubs with real contract calls",
+        "secure key management patterns",
+        "add .env.example and dotenv loading"
+      ],
+      "outputs": [".agent/output/cli-report.md"]
+    },
+    {
+      "id": "docs-reconciliation",
+      "name": "Docs Reconciliation",
+      "path": "agents/docs-reconciliation",
+      "dependsOn": ["integration-gate"],
+      "scope": ["docs", "README.md", "OVERVIEW.md"],
+      "criticalIssues": [
+        "sidebar matches existing pages",
+        "remove references to unimplemented features",
+        "align README scripts with package.json"
+      ],
+      "outputs": [".agent/output/docs-report.md"]
+    },
+    {
+      "id": "enterprise-readiness",
+      "name": "Enterprise Readiness",
+      "path": "agents/enterprise-readiness",
+      "dependsOn": ["contracts-hardening", "ui-integration", "cli-implementation", "docs-reconciliation"],
+      "scope": ["agents/ASSEMBLY_STATUS.md", "docs/"],
+      "outputs": [".agent/output/enterprise-scorecard.md"]
+    }
+  ],
+  "orchestrator": {
+    "id": "assembly-orchestrator",
+    "path": "agents/orchestrator",
+    "schedule": "0 */6 * * *",
+    "handoffFile": ".agent/output/assembly-plan.md"
+  }
+}

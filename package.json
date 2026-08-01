@@ -25,6 +25,7 @@
     "test:contracts:gas": "npm run gas-report --workspace=@ens-granular/contracts",
     "test:ui": "npm run test --workspace=@ens-granular/ui",
     "test:all": "npm run test:contracts && npm run test:ui",
+    "assembly:gate": "bash scripts/assembly-gate.sh",
     "clean": "npm run clean --workspaces"
   },
   "devDependencies": {

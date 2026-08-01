@@ -12,6 +12,7 @@ coverage/
 *.log
 docs/.docusaurus/
 docs/build/
+.agent/
 
 # CI: re-add when gh token has workflow scope
 .github/workflows/

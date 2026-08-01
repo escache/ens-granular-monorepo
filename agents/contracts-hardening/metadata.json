@@ -1,0 +1,5 @@
+{
+  "name": "Contracts Hardening",
+  "description": "Fixes critical GNA smart contract issues, expands integration tests, and advances audit readiness for enterprise deployment",
+  "version": "1.0.0"
+}

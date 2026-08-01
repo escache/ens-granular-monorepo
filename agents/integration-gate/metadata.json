@@ -1,0 +1,5 @@
+{
+  "name": "Integration Gate",
+  "description": "Runs build, contract tests, UI tests, and lint; publishes machine-readable gate report for the assembly pipeline",
+  "version": "1.0.0"
+}
