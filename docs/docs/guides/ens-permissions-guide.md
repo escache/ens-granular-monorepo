@@ -2,40 +2,6 @@
 
 A comprehensive guide to all permissions and authorization mechanisms in ENS for root-level names and subdomains, including security best practices and troubleshooting.
 
-## Table of Contents
-
-1. [Overview](#overview)
-2. [NameWrapper Fuses](#namewrapper-fuses)
-3. [Resolver Authorization](#resolver-authorization)
-4. [NameWrapper ERC-1155 Approvals](#namewrapper-erc-1155-approvals)
-5. [Registry Owner](#registry-owner)
-6. [NameWrapper Owner](#namewrapper-owner)
-7. [TTL (Time To Live)](#ttl-time-to-live)
-8. [Registration Expiry](#registration-expiry)
-9. [Parent Domain Control](#parent-domain-control)
-10. [Controller Permissions](#controller-permissions)
-11. [Reverse Registrar Authorization](#reverse-registrar-authorization)
-12. [Permission Hierarchy](#permission-hierarchy)
-13. [Contract Authorization Requirements](#contract-authorization-requirements)
-14. [Security Best Practices](#security-best-practices)
-15. [Example Permission Check Flow](#example-permission-check-flow)
-16. [Multisig and DAO Considerations](#multisig-and-dao-considerations)
-17. [Edge Cases and Common Pitfalls](#edge-cases-and-common-pitfalls)
-18. [Gas Optimization](#gas-optimization)
-19. [Testing Strategies](#testing-strategies)
-20. [Security Vulnerabilities](#security-vulnerabilities)
-21. [Cross-Chain Considerations](#cross-chain-considerations)
-22. [Troubleshooting](#troubleshooting)
-23. [Real-World Scenarios](#real-world-scenarios)
-24. [Wildcard Resolution (ENSIP-10)](#wildcard-resolution-ensip-10)
-25. [DNSSEC Integration (ENSIP-7, ENSIP-11)](#dnssec-integration-ensip-7-ensip-11)
-26. [Multicoin Address Records](#multicoin-address-records)
-27. [Commitment Period System](#commitment-period-system)
-28. [Grace Periods](#grace-periods)
-29. [Additional Resolver Records](#additional-resolver-records)
-30. [Reverse Resolution Details](#reverse-resolution-details)
-31. [References](#references)
-
 ## Overview
 
 This guide provides a complete reference for understanding and managing permissions in the Ethereum Name Service (ENS). It covers all authorization mechanisms, security considerations, and best practices for both root-level names and subdomains.

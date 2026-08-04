@@ -21,7 +21,30 @@ const sidebars = {
       label: 'Architecture',
       items: [
         'architecture/overview',
+        'architecture/factory-design',
+        'architecture/final-architecture',
         'implementation-status',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Guides',
+      items: [
+        'guides/ens-permissions-guide',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Reference',
+      items: [
+        'api/cli-summary',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Examples',
+      items: [
+        'examples/presentation-script',
       ],
     },
   ],
