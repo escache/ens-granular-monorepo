@@ -274,8 +274,8 @@ Now that you have ENS Granular installed:
 
 1. **[Quick Start Guide](quickstart)** - Get up and running quickly
 2. **[Architecture Overview](architecture/overview)** - Understand the system
-3. **[CLI Commands](api/cli-commands)** - Learn the command-line interface
-4. **[TypeScript SDK](api/typescript-sdk)** - Explore programmatic access
+3. **[CLI Commands](api/cli-summary)** - Learn the command-line interface
+4. **TypeScript SDK** - Programmatic access (documentation coming soon)
 
 ---
 

@@ -132,7 +132,7 @@ Ready to start using ENS Granular? Here's what you need to do:
 1. **[Installation](installation)** - Set up your development environment
 2. **[Quick Start](quickstart)** - Get up and running in minutes
 3. **[Architecture Overview](architecture/overview)** - Understand the system design
-4. **[CLI Commands](api/cli-commands)** - Learn the command-line interface
+4. **[CLI Commands](api/cli-summary)** - Learn the command-line interface
 
 ## Security Considerations
 

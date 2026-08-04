@@ -182,10 +182,10 @@ Domain Owner
 
 Ready to explore the architecture in detail?
 
-1. **[Factory Design](factory-design)** - Deep dive into the factory pattern
-2. **[Granular Permissions](granular-permissions)** - Permission system details
-3. **[Delegation Hierarchy](delegation-hierarchy)** - Delegation structure
-4. **[Security Model](security-model)** - Security considerations
+1. **[Factory Design](./factory-design)** - Deep dive into the factory pattern
+2. **[Granular Permissions](../guides/ens-permissions-guide)** - Permission system details
+3. **[Delegation Hierarchy](../guides/ens-permissions-guide)** - Delegation structure
+4. **[Security Model](./final-architecture)** - Security considerations
 
 ---
 

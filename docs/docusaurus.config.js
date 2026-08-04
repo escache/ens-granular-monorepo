@@ -72,7 +72,7 @@ const config = {
             label: 'Documentation',
           },
           {
-            to: '/docs/intro',
+            to: '/docs/api/cli-summary',
             label: 'API',
             position: 'left',
           },
@@ -104,7 +104,7 @@ const config = {
               },
               {
                 label: 'API Reference',
-                to: '/api/cli-commands',
+                to: '/docs/api/cli-summary',
               },
             ],
           },
@@ -129,12 +129,8 @@ const config = {
             title: 'More',
             items: [
               {
-                label: 'Blog',
-                to: '/blog',
-              },
-              {
                 label: 'Examples',
-                to: '/examples/complete-delegation-tree',
+                to: '/docs/examples/presentation-script',
               },
             ],
           },

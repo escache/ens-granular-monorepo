@@ -168,9 +168,9 @@ The system supports these operation types:
 Now that you're up and running, explore these areas:
 
 1. **[Architecture Overview](architecture/overview)** - Understand the system design
-2. **[Delegation System Guide](guides/delegation-system)** - Deep dive into delegation
-3. **[API Reference](api/cli-commands)** - Complete API documentation
-4. **[Examples](examples/complete-delegation-tree)** - Practical examples
+2. **[Delegation System Guide](guides/ens-permissions-guide)** - Deep dive into delegation
+3. **[API Reference](api/cli-summary)** - Complete API documentation
+4. **[Examples](examples/presentation-script)** - Practical examples
 
 ## Troubleshooting
 
